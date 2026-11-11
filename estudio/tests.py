@@ -171,18 +171,27 @@ class PlanTestCase(TestCase):
         self.assertEqual(lectura.libro, primero)
         self.assertEqual(self.client.get(reverse("libros")).status_code, 200)
 
-    def test_la_lectura_prioriza_los_libros_que_tengo(self):
+    def test_la_lectura_es_siempre_el_primero_de_la_lista(self):
         pendientes, *_ = plan.checklist(self.usuario, LUNES)
         lectura = next(t for t in pendientes if t.tipo == Tarea.LECTURA)
-        self.assertEqual(lectura.libro, Libro.objects.first())
+        primero = Libro.objects.first()
+        self.assertEqual(lectura.libro, primero)
         holmes = Libro.objects.get(titulo="Las novelas completas de Sherlock Holmes")
         self.client.force_login(self.usuario)
         self.client.post(reverse("libro_tengo", args=[holmes.pk]))
         lectura.refresh_from_db()
-        self.assertEqual(lectura.libro, holmes)
+        self.assertEqual(lectura.libro, primero)
         r = self.client.get(reverse("libros") + "?filtro=tengo")
         self.assertContains(r, "Sherlock Holmes")
         self.assertNotContains(r, "Las claves de la argumentación")
+
+        # Una lectura pendiente con otro libro se corrige al abrir el día.
+        lectura.libro = holmes
+        lectura.save()
+        for dia in range(3):
+            pendientes, *_ = plan.checklist(self.usuario, LUNES + timedelta(days=dia))
+            lectura = next(t for t in pendientes if t.tipo == Tarea.LECTURA)
+            self.assertEqual(lectura.libro, primero)
 
     def test_jueves_de_la_etapa_1_es_aprender_a_aprender(self):
         jueves = LUNES + timedelta(days=3)

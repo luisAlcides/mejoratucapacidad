@@ -373,14 +373,6 @@ def libro_tengo(request, pk):
     lectura, _ = LecturaLibro.objects.get_or_create(usuario=request.user, libro=libro)
     lectura.tengo = not lectura.tengo
     lectura.save(update_fields=["tengo"])
-    # Si la lectura de hoy no la elegiste tú, se ajusta para priorizar lo que tienes.
-    if not plan.perfil_de(request.user).libro_actual_id:
-        anterior = Tarea.objects.filter(
-            usuario=request.user, tipo=Tarea.LECTURA, hecha=False
-        ).select_related("libro").first()
-        nuevo = plan.libro_actual(request.user)
-        if anterior and anterior.libro_id != (nuevo and nuevo.id):
-            plan.cambiar_lectura_pendiente(request.user, anterior.libro, nuevo)
     return volver(request, "libros")
 
 

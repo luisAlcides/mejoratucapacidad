@@ -142,8 +142,7 @@ def crear_tarea_estudio(usuario, materia, fecha, tipo=Tarea.ESTUDIO, opcional=Fa
 
 
 def libro_actual(usuario):
-    """El libro elegido si no está terminado; si no, el siguiente sin terminar de la lista,
-    empezando por los que el usuario ya tiene."""
+    """El libro elegido si no está terminado; si no, el primero sin terminar de la lista."""
     terminados = LecturaLibro.objects.filter(usuario=usuario, terminado__isnull=False).values(
         "libro_id"
     )
@@ -152,9 +151,7 @@ def libro_actual(usuario):
         usuario=usuario, libro=elegido, terminado__isnull=False
     ).exists():
         return elegido
-    pendientes = Libro.objects.exclude(id__in=terminados)
-    tengo = LecturaLibro.objects.filter(usuario=usuario, tengo=True).values("libro_id")
-    return pendientes.filter(id__in=tengo).first() or pendientes.first()
+    return Libro.objects.exclude(id__in=terminados).order_by("orden", "id").first()
 
 
 def cambiar_lectura_pendiente(usuario, anterior, nuevo):
@@ -243,6 +240,13 @@ def generar_dia(usuario, fecha):
 def checklist(usuario, hoy):
     """Tareas de hoy (pendientes y hechas) y los repasos que tocan, sin acumular."""
     generar_dia(usuario, hoy)
+    # La lectura pendiente siempre es el libro que toca ahora, aunque la lista haya cambiado.
+    pendiente = Tarea.objects.filter(
+        usuario=usuario, tipo=Tarea.LECTURA, hecha=False
+    ).select_related("libro").first()
+    actual = libro_actual(usuario)
+    if pendiente and pendiente.libro_id != (actual and actual.id):
+        cambiar_lectura_pendiente(usuario, pendiente.libro, actual)
     tareas = Tarea.objects.filter(usuario=usuario, fecha__lte=hoy).select_related(
         "tema__materia", "libro"
     )

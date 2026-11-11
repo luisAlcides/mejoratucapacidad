@@ -85,7 +85,7 @@ GUIAS = [
                 ("Nada se acumula", "Lo que no tachas se quita al día siguiente, pero el tema no avanza hasta que lo estudias."),
                 ("+ Materia", "En «¿Con energía extra?» adelantas la siguiente sesión."),
                 ("Deshacer", "Si tachaste algo por error, puedes deshacerlo en «Tachado hoy»."),
-                ("Libros", "«Lo tengo» marca tus libros; la lectura diaria empieza por ellos. «Leer este ahora» lo elige."),
+                ("Libros", "La lectura diaria es el primer libro sin terminar de la lista. «Leer este ahora» elige otro; «Lo tengo» marca los que tienes."),
                 ("Ajustes", "Duración de la sesión (20, 30 o 45 min), zona horaria, inglés y modo oscuro."),
             ]},
         ],

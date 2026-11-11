@@ -1987,8 +1987,7 @@ ETAPAS = [
 ]
 
 # Lista de lectura en el orden recomendado: (título, autor, para qué, materia, año del plan).
-# La lectura diaria toma el libro que elijas; si no eliges, el siguiente sin terminar,
-# dando prioridad a los que marcaste como «Lo tengo».
+# La lectura diaria toma el libro que elijas; si no eliges, el primero sin terminar de la lista.
 # Se identifican por título: no lo cambies si ya hay progreso.
 LIBROS = [
     # Tus libros: los que ya tienes, en el orden en que los quieres leer
