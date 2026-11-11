@@ -4,11 +4,12 @@ from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q, Sum
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from . import plan
+from . import guias, plan
 from .forms import CuadernoForm, PerfilForm, RegistroForm
 from .models import (
     Etapa,
@@ -422,6 +423,23 @@ def cambiar_apariencia(request):
     perfil.apariencia = perfil.OSCURO if perfil.apariencia == perfil.CLARO else perfil.CLARO
     perfil.save(update_fields=["apariencia"])
     return volver(request, "hoy")
+
+
+@login_required
+def guia(request):
+    grupos = [
+        {"etiqueta": etiqueta, "guias": [g for g in guias.GUIAS if g["grupo"] == clave]}
+        for clave, etiqueta in guias.GRUPOS
+    ]
+    return render(request, "estudio/guia.html", {"grupos": grupos})
+
+
+@login_required
+def guia_detalle(request, slug):
+    g = guias.por_slug(slug)
+    if g is None:
+        raise Http404("Guía no encontrada")
+    return render(request, "estudio/guia_detalle.html", {"guia": guias.preparar(g), "guias": guias.GUIAS})
 
 
 @login_required

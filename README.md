@@ -53,8 +53,8 @@ El temario está en `estudio/temario.py`; tras editarlo ejecuta `cargar_plan`
    `CSRF_TRUSTED_ORIGINS` se configuran solos con `RAILWAY_PUBLIC_DOMAIN`.
 6. Abre el dominio, crea tu cuenta y, en **Libros**, marca «Lo tengo» en los tuyos.
 
-`railway.json` ya define: `collectstatic` al construir, `migrate` + `cargar_plan`
-antes de cada despliegue, `gunicorn` para arrancar y `/salud/` como healthcheck.
+`railway.json` ya define: `collectstatic` al construir, `preparar` (migraciones +
+`cargar_plan`) antes de cada despliegue, `gunicorn` para arrancar y `/salud/` como healthcheck.
 
 Para entrar al panel `/admin/`: `railway run python manage.py createsuperuser`
 (con la CLI de Railway) o desde la consola del servicio.

@@ -13,7 +13,7 @@
 <body class="min-h-screen font-sans antialiased">
   {% if user.is_authenticated %}
   {% with url=request.resolver_match.url_name %}
-  <header class="sticky top-0 z-20 border-b border-borde bg-superficie/90 backdrop-blur">
+  <header class="print:hidden sticky top-0 z-20 border-b border-borde bg-superficie/90 backdrop-blur">
     <div class="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
       <a href="{% url 'hoy' %}" class="flex items-center gap-2 font-semibold">
         <span class="grid h-8 w-8 place-items-center rounded-lg bg-acento text-acento-texto">
@@ -26,10 +26,14 @@
         <a href="{% url 'temario' %}" class="rounded-lg px-3 py-1.5 {% if url == 'temario' or url == 'tema' %}bg-superficie-2 font-semibold{% else %}text-texto-suave hover:text-texto{% endif %}">Temario</a>
         <a href="{% url 'calendario' %}" class="rounded-lg px-3 py-1.5 {% if url == 'calendario' %}bg-superficie-2 font-semibold{% else %}text-texto-suave hover:text-texto{% endif %}">Calendario</a>
         <a href="{% url 'libros' %}" class="rounded-lg px-3 py-1.5 {% if url == 'libros' %}bg-superficie-2 font-semibold{% else %}text-texto-suave hover:text-texto{% endif %}">Libros</a>
+        <a href="{% url 'guia' %}" class="rounded-lg px-3 py-1.5 {% if url == 'guia' or url == 'guia_detalle' %}bg-superficie-2 font-semibold{% else %}text-texto-suave hover:text-texto{% endif %}">Guía</a>
         <a href="{% url 'progreso' %}" class="rounded-lg px-3 py-1.5 {% if url == 'progreso' %}bg-superficie-2 font-semibold{% else %}text-texto-suave hover:text-texto{% endif %}">Progreso</a>
         <a href="{% url 'ajustes' %}" class="rounded-lg px-3 py-1.5 {% if url == 'ajustes' %}bg-superficie-2 font-semibold{% else %}text-texto-suave hover:text-texto{% endif %}">Ajustes</a>
       </nav>
       <div class="flex items-center gap-1">
+      <a href="{% url 'guia' %}" title="Guía y chuletas" aria-label="Guía y chuletas" class="grid h-9 w-9 place-items-center rounded-lg sm:hidden {% if url == 'guia' or url == 'guia_detalle' %}bg-superficie-2 text-texto{% else %}text-texto-suave hover:bg-superficie-2 hover:text-texto{% endif %}">
+        <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01"/></svg>
+      </a>
       <form method="post" action="{% url 'cambiar_apariencia' %}" class="flex">
         {% csrf_token %}<input type="hidden" name="siguiente" value="{{ request.get_full_path }}">
         <button title="{% if user.perfil.apariencia == 'oscuro' %}Cambiar a modo claro{% else %}Cambiar a modo oscuro{% endif %}" aria-label="Cambiar modo claro u oscuro" class="grid h-9 w-9 place-items-center rounded-lg text-texto-suave hover:bg-superficie-2 hover:text-texto">
@@ -47,7 +51,7 @@
     </div>
   </header>
 
-  <nav class="fixed inset-x-0 bottom-0 z-20 border-t border-borde bg-superficie sm:hidden">
+  <nav class="print:hidden fixed inset-x-0 bottom-0 z-20 border-t border-borde bg-superficie sm:hidden">
     <div class="mx-auto grid max-w-3xl grid-cols-5 text-xs">
       <a href="{% url 'hoy' %}" class="flex flex-col items-center gap-0.5 py-2 {% if url == 'hoy' or url == 'sesion' %}text-acento font-semibold{% else %}text-texto-suave{% endif %}">
         <svg viewBox="0 0 24 24" class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>Hoy</a>

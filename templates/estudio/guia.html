@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% load estudio_tags %}
+{% block titulo %}Guía · Mejora tu capacidad{% endblock %}
+{% block contenido %}
+<h1 class="text-2xl font-bold">Guía</h1>
+<p class="mt-1 text-sm text-texto-suave">Chuletas para consultar mientras estudias: técnicas, fórmulas, reglas y frases clave. Puedes imprimirlas o guardarlas en PDF.</p>
+
+{% for grupo in grupos %}
+<section class="mt-6">
+  <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-texto-suave">{{ grupo.etiqueta }}</h2>
+  <div class="grid gap-2 sm:grid-cols-2">
+    {% for g in grupo.guias %}
+    <a href="{% url 'guia_detalle' g.slug %}" class="flex gap-3 rounded-xl border border-borde bg-superficie p-4 hover:bg-superficie-2">
+      <span class="mt-1.5 h-3 w-3 shrink-0 rounded-full {{ g.color|color:'punto' }}"></span>
+      <span class="min-w-0">
+        <span class="block font-semibold">{{ g.titulo }}</span>
+        <span class="block text-sm text-texto-suave">{{ g.descripcion }}</span>
+      </span>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% endfor %}
+{% endblock %}

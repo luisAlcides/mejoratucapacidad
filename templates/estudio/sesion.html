@@ -15,6 +15,9 @@
   {% if tema.recurso %}
   <p class="mt-2 text-sm">Material: {% if tema.recurso_url %}<a href="{{ tema.recurso_url }}" target="_blank" rel="noopener" class="font-medium text-acento underline">{{ tema.recurso }} ↗</a>{% else %}{{ tema.recurso }}{% endif %}</p>
   {% endif %}
+  {% with g=tema.materia|guia_de %}{% if g %}
+  <p class="mt-2 text-sm"><a href="{% url 'guia_detalle' g.slug %}" class="font-medium text-acento underline">Abrir chuleta: {{ g.titulo }}</a></p>
+  {% endif %}{% endwith %}
 </header>
 
 <section id="temporizador" class="mt-6 rounded-2xl border border-borde bg-superficie p-5">

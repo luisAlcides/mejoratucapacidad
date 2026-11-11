@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% load estudio_tags %}
+{% block titulo %}{{ guia.titulo }} · Guía{% endblock %}
+{% block contenido %}
+<div class="flex items-center justify-between gap-2 print:hidden">
+  <a href="{% url 'guia' %}" class="text-sm text-texto-suave hover:text-texto">← Guía</a>
+  <button type="button" onclick="window.print()" class="rounded-lg border border-borde px-3 py-1.5 text-sm hover:bg-superficie-2">Imprimir o guardar PDF</button>
+</div>
+
+<header class="mt-3">
+  <span class="inline-block h-1.5 w-12 rounded-full {{ guia.color|color:'barra' }}"></span>
+  <h1 class="mt-2 text-2xl font-bold">{{ guia.titulo }}</h1>
+  <p class="mt-1 text-texto-suave">{{ guia.descripcion }}</p>
+</header>
+
+{% if guia.secciones|length > 2 %}
+<nav class="mt-4 flex flex-wrap gap-2 print:hidden" aria-label="Secciones">
+  {% for s in guia.secciones %}
+  <a href="#s{{ forloop.counter }}" class="rounded-full border border-borde px-3 py-1 text-xs text-texto-suave hover:text-texto">{{ s.titulo }}</a>
+  {% endfor %}
+</nav>
+{% endif %}
+
+{% for s in guia.secciones %}
+<section id="s{{ forloop.counter }}" class="mt-5 scroll-mt-20 rounded-2xl border border-borde bg-superficie p-5 print:break-inside-avoid print:border-0 print:p-0">
+  <h2 class="text-lg font-semibold">{{ s.titulo }}</h2>
+
+  {% if s.tipo == "tabla" %}
+  <div class="mt-3 overflow-x-auto">
+    <table class="w-full text-left text-sm">
+      <thead>
+        <tr class="border-b border-borde text-xs uppercase tracking-wide text-texto-suave">
+          {% for c in s.columnas %}<th class="py-2 pr-4 font-semibold">{{ c }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-borde">
+        {% for fila in s.filas %}
+        <tr>{% for celda in fila %}<td class="py-2 pr-4 align-top {% if forloop.first %}font-medium{% endif %}">{{ celda }}</td>{% endfor %}</tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% elif s.tipo == "pasos" %}
+  <ol class="mt-3 space-y-2">
+    {% for item in s.items %}
+    <li class="flex gap-3 text-sm">
+      <span class="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-acento/15 text-xs font-bold text-acento">{{ forloop.counter }}</span>
+      <span class="pt-0.5">{{ item }}</span>
+    </li>
+    {% endfor %}
+  </ol>
+
+  {% elif s.tipo == "codigo" %}
+  <pre class="mt-3 overflow-x-auto rounded-lg bg-superficie-2 p-4 text-[13px] leading-relaxed"><code>{{ s.codigo }}</code></pre>
+
+  {% else %}
+  <ul class="mt-3 divide-y divide-borde">
+    {% for item in s.items %}
+    <li class="py-2 text-sm">
+      {% if item.termino %}
+      <span class="font-semibold">{{ item.termino }}</span><span class="text-texto-suave"> · </span><span>{{ item.texto }}</span>
+      {% else %}
+      <span class="flex gap-2"><span class="text-acento">•</span><span>{{ item.texto }}</span></span>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</section>
+{% endfor %}
+
+<nav class="mt-8 border-t border-borde pt-4 print:hidden" aria-label="Otras guías">
+  <p class="text-xs font-semibold uppercase tracking-wide text-texto-suave">Otras guías</p>
+  <div class="mt-2 flex flex-wrap gap-2">
+    {% for g in guias %}{% if g.slug != guia.slug %}
+    <a href="{% url 'guia_detalle' g.slug %}" class="rounded-full border border-borde px-3 py-1 text-xs hover:bg-superficie-2">{{ g.titulo }}</a>
+    {% endif %}{% endfor %}
+  </div>
+</nav>
+{% endblock %}

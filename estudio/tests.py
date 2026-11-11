@@ -222,7 +222,7 @@ class VistasTestCase(TestCase):
             "zona_horaria": "America/Managua",
         })
         self.assertRedirects(r, reverse("hoy"))
-        for nombre in ["hoy", "temario", "calendario", "progreso", "libros", "ajustes"]:
+        for nombre in ["hoy", "temario", "calendario", "progreso", "libros", "guia", "ajustes"]:
             self.assertEqual(self.client.get(reverse(nombre)).status_code, 200, nombre)
 
         tarea = Tarea.objects.filter(tipo=Tarea.ESTUDIO).first()
@@ -235,6 +235,16 @@ class VistasTestCase(TestCase):
         tema = Tema.objects.first()
         url = reverse("tema", args=[tema.materia.slug, tema.slug])
         self.assertEqual(self.client.get(url).status_code, 200)
+
+    def test_todas_las_guias_se_muestran(self):
+        from .guias import GUIAS
+        usuario = User.objects.create_user("gus", password="clave-segura-123")
+        Perfil.objects.create(usuario=usuario)
+        self.client.force_login(usuario)
+        for g in GUIAS:
+            r = self.client.get(reverse("guia_detalle", args=[g["slug"]]))
+            self.assertContains(r, g["titulo"])
+        self.assertEqual(self.client.get(reverse("guia_detalle", args=["no-existe"])).status_code, 404)
 
     def test_requiere_login(self):
         r = self.client.get(reverse("hoy"))

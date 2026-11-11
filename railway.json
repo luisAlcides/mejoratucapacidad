@@ -5,7 +5,7 @@
     "buildCommand": "python manage.py collectstatic --noinput"
   },
   "deploy": {
-    "preDeployCommand": ["python manage.py migrate --noinput && python manage.py cargar_plan"],
+    "preDeployCommand": ["python manage.py preparar"],
     "startCommand": "gunicorn config.wsgi --bind 0.0.0.0:$PORT --workers 2 --timeout 60",
     "healthcheckPath": "/salud/",
     "restartPolicyType": "ON_FAILURE"
