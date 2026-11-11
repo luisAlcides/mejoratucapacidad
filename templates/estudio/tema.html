@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% load estudio_tags %}
+{% block titulo %}{{ tema.titulo }} · Temario{% endblock %}
+{% block contenido %}
+<a href="{% url 'temario' %}" class="text-sm text-texto-suave hover:text-texto">← Temario</a>
+
+<header class="mt-3">
+  <span class="rounded-full px-2 py-0.5 text-xs font-medium {{ tema.materia|color }}">{{ tema.materia.nombre }} · Tema {{ tema.orden }}</span>
+  <h1 class="mt-2 text-2xl font-bold">{{ tema.titulo }}</h1>
+  {% if tema.descripcion %}<p class="mt-1 text-texto-suave">{{ tema.descripcion }}</p>{% endif %}
+  {% if tema.recurso %}
+  <p class="mt-2 text-sm">Material: {% if tema.recurso_url %}<a href="{{ tema.recurso_url }}" target="_blank" rel="noopener" class="font-medium text-acento underline">{{ tema.recurso }} ↗</a>{% else %}{{ tema.recurso }}{% endif %}</p>
+  {% endif %}
+</header>
+
+<section class="mt-5 grid grid-cols-3 gap-2 text-center">
+  <div class="rounded-xl border border-borde bg-superficie p-3">
+    <div class="text-xs text-texto-suave">Estado</div>
+    <div class="mt-1 font-semibold">{{ progreso.get_estado_display }}</div>
+  </div>
+  <div class="rounded-xl border border-borde bg-superficie p-3">
+    <div class="text-xs text-texto-suave">Sesiones</div>
+    <div class="mt-1 font-semibold tabular-nums">{{ progreso.sesiones_hechas }} / {{ tema.sesiones|add:progreso.sesiones_extra }}</div>
+  </div>
+  <div class="rounded-xl border border-borde bg-superficie p-3">
+    <div class="text-xs text-texto-suave">{% if progreso.dominado %}Dominado el{% else %}Empezado el{% endif %}</div>
+    <div class="mt-1 font-semibold">{% firstof progreso.dominado|date:"j/m/Y" progreso.iniciado|date:"j/m/Y" "—" %}</div>
+  </div>
+</section>
+
+<form method="post" class="mt-3 flex flex-wrap gap-2">
+  {% csrf_token %}
+  {% if progreso.estado == "dominado" %}
+  <button name="accion" value="reiniciar" class="rounded-lg border border-borde px-3 py-2 text-sm">Volver a estudiarlo</button>
+  {% else %}
+  <button name="accion" value="dominar" class="rounded-lg border border-borde px-3 py-2 text-sm hover:bg-superficie-2">Ya lo domino: saltar este tema</button>
+  {% endif %}
+</form>
+
+{% if tema.lista_preguntas %}
+<section class="mt-6 rounded-2xl border border-borde bg-superficie p-5">
+  <h2 class="text-lg font-semibold">Autoevaluación</h2>
+  <p class="text-sm text-texto-suave">Si puedes responder esto sin mirar, dominas el tema.</p>
+  <ol class="mt-3 space-y-2">
+    {% for p in tema.lista_preguntas %}
+    <li class="flex gap-3 rounded-lg bg-superficie-2 px-3 py-2.5 text-sm">
+      <span class="font-semibold text-acento">{{ forloop.counter }}.</span><span>{{ p }}</span>
+    </li>
+    {% endfor %}
+  </ol>
+</section>
+{% endif %}
+
+<section class="mt-6 rounded-2xl border border-borde bg-superficie p-5">
+  <h2 class="text-lg font-semibold">Cuaderno</h2>
+  <form method="post" class="mt-4 space-y-4">
+    {% csrf_token %}
+    {% for campo in form %}
+    <label class="block">
+      <span class="mb-1 block text-sm font-medium">{{ campo.label }}</span>
+      {{ campo }}
+    </label>
+    {% endfor %}
+    <button class="rounded-lg bg-acento px-4 py-2 text-sm font-semibold text-acento-texto">Guardar cuaderno</button>
+  </form>
+</section>
+
+{% if sesiones or repasos %}
+<section class="mt-6 grid gap-3 sm:grid-cols-2">
+  <div class="rounded-2xl border border-borde bg-superficie p-4">
+    <h2 class="text-sm font-semibold">Sesiones hechas</h2>
+    <ul class="mt-2 space-y-1 text-sm">
+      {% for s in sesiones %}<li class="flex justify-between gap-2"><span class="truncate text-texto-suave">{{ s.detalle }}</span><span class="shrink-0 tabular-nums">{{ s.hecha_el|date:"j/m" }}</span></li>
+      {% empty %}<li class="text-texto-suave">Todavía ninguna.</li>{% endfor %}
+    </ul>
+  </div>
+  <div class="rounded-2xl border border-borde bg-superficie p-4">
+    <h2 class="text-sm font-semibold">Repasos</h2>
+    <ul class="mt-2 space-y-1 text-sm">
+      {% for r in repasos %}
+      <li class="flex justify-between gap-2">
+        <span class="text-texto-suave">{{ r.nombre_paso }}{% if r.resultado %} · {{ r.get_resultado_display }}{% endif %}</span>
+        <span class="tabular-nums {% if not r.hecho_el %}font-semibold text-acento{% endif %}">{% if r.hecho_el %}{{ r.hecho_el|date:"j/m" }}{% else %}Próximo: {{ r.fecha|date:"j/m" }}{% endif %}</span>
+      </li>
+      {% empty %}<li class="text-texto-suave">Se programan al terminar la primera sesión.</li>{% endfor %}
+    </ul>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

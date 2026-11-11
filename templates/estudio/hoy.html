@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% load estudio_tags %}
+{% block titulo %}Hoy · Mejora tu capacidad{% endblock %}
+{% block contenido %}
+
+<section class="mb-6">
+  <p class="text-sm text-texto-suave">{{ dia }} {{ fecha|date:"j \d\e F" }}{% if etapa %} · {{ etapa.nombre }}{% endif %}</p>
+  <h1 class="mt-1 text-2xl font-bold sm:text-3xl">
+    {% if materia %}Hoy toca {{ materia.nombre }}{% elif fecha.weekday == 5 %}Hoy toca repaso de la semana{% else %}Hoy toca descansar{% endif %}
+  </h1>
+
+  <div class="mt-4 flex items-center gap-4 rounded-2xl border border-borde bg-superficie p-4">
+    <div class="flex-1">
+      <div class="flex items-baseline justify-between text-sm">
+        <span class="font-medium">{{ completadas }} de {{ total }} tachadas</span>
+        <span class="text-texto-suave">{{ completadas|porcentaje:total }} %</span>
+      </div>
+      <div class="mt-2 h-2.5 overflow-hidden rounded-full bg-superficie-2">
+        <div class="h-full rounded-full bg-acento transition-all" style="width: {{ completadas|porcentaje:total }}%"></div>
+      </div>
+    </div>
+    <div class="border-l border-borde pl-4 text-center">
+      <div class="text-2xl font-bold leading-none">{{ racha }}</div>
+      <div class="mt-1 text-xs text-texto-suave">día{{ racha|pluralize }} de racha</div>
+    </div>
+  </div>
+</section>
+
+{% if repasos %}
+<section class="mb-6">
+  <h2 class="mb-2 text-sm font-semibold uppercase tracking-wide text-texto-suave">Repasos de hoy</h2>
+  <p class="mb-3 text-sm text-texto-suave">Intenta recordar el tema <strong>sin mirar</strong> y después responde con sinceridad.</p>
+  <ul class="space-y-2">
+    {% for r in repasos %}
+    <li class="rounded-xl border border-borde bg-superficie p-4">
+      <div class="flex flex-wrap items-center gap-2 text-xs">
+        <span class="rounded-full px-2 py-0.5 font-medium {{ r.tema.materia|color }}">{{ r.tema.materia.nombre }}</span>
+        <span class="text-texto-suave">{{ r.nombre_paso }}</span>
+        {% if r.fecha < fecha %}<span class="text-texto-suave">· tocaba el {{ r.fecha|date:"j/m" }}</span>{% endif %}
+      </div>
+      <a href="{% url 'tema' r.tema.materia.slug r.tema.slug %}" class="mt-1 block font-semibold hover:underline">{{ r.tema.titulo }}</a>
+      <form method="post" action="{% url 'completar_repaso' r.pk %}" class="mt-3 grid grid-cols-3 gap-2">
+        {% csrf_token %}
+        <button name="resultado" value="olvide" class="rounded-lg border border-borde px-2 py-2 text-sm hover:bg-superficie-2">😕 Lo olvidé</button>
+        <button name="resultado" value="costo" class="rounded-lg border border-borde px-2 py-2 text-sm hover:bg-superficie-2">🤔 Me costó</button>
+        <button name="resultado" value="facil" class="rounded-lg border border-borde px-2 py-2 text-sm hover:bg-superficie-2">😄 Fácil</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% if repasos_en_espera > 0 %}
+  <p class="mt-2 text-xs text-texto-suave">{{ repasos_en_espera }} repaso{{ repasos_en_espera|pluralize }} más esperan su turno: aparecerán en los próximos días, sin amontonarse.</p>
+  {% endif %}
+</section>
+{% endif %}
+
+<section class="mb-6">
+  <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-texto-suave">Por hacer</h2>
+  {% if todo_listo %}
+  <div class="rounded-2xl border border-dashed border-borde bg-superficie p-6 text-center">
+    <div class="text-3xl">🎉</div>
+    <p class="mt-2 font-semibold">¡Terminaste lo de hoy!</p>
+    <p class="mt-1 text-sm text-texto-suave">Descansa. Dormir bien también es parte de aprender.</p>
+  </div>
+  {% endif %}
+  <ul class="space-y-2">
+    {% for t in pendientes %}
+    <li class="flex gap-3 rounded-xl border border-borde bg-superficie p-4">
+      {% if not t.es_comprobacion %}
+      <form method="post" action="{% url 'completar' t.pk %}">
+        {% csrf_token %}
+        <button title="Tachar" aria-label="Marcar «{{ t.titulo }}» como hecha" class="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full border-2 border-borde text-transparent transition hover:border-acento hover:text-acento">
+          <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4 10-11"/></svg>
+        </button>
+      </form>
+      {% else %}
+      <span class="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-acento/15 text-acento">?</span>
+      {% endif %}
+      <div class="min-w-0 flex-1">
+        <div class="flex flex-wrap items-center gap-2 text-xs">
+          {% if t.tema %}
+          <span class="rounded-full px-2 py-0.5 font-medium {{ t.tema.materia|color }}">{{ t.tema.materia.nombre }}</span>
+          <span class="text-texto-suave">{% if t.es_comprobacion %}Comprobación{% else %}Sesión {{ t.numero_sesion }}{% endif %}</span>
+          {% else %}
+          <span class="rounded-full bg-superficie-2 px-2 py-0.5 font-medium">{{ t.get_tipo_display }}</span>
+          {% endif %}
+          {% if t.opcional %}<span class="text-texto-suave">Opcional</span>{% endif %}
+        </div>
+        <p class="mt-1 font-semibold">{{ t.titulo }}</p>
+        {% if t.detalle %}<p class="text-sm text-texto-suave">{{ t.detalle }}</p>{% endif %}
+
+        {% if t.tema %}
+          {% if t.es_comprobacion %}
+          {% if t.tema.lista_preguntas %}
+          <ol class="mt-3 list-decimal space-y-1 rounded-lg bg-superficie-2 py-2.5 pl-8 pr-3 text-sm">
+            {% for p in t.tema.lista_preguntas %}<li>{{ p }}</li>{% endfor %}
+          </ol>
+          <p class="mt-2 text-xs text-texto-suave">Responde sin mirar y resuelve también algunos ejercicios básicos.</p>
+          {% endif %}
+          <form method="post" action="{% url 'completar' t.pk %}" class="mt-3 flex flex-wrap gap-2">
+            {% csrf_token %}
+            <button name="logrado" value="1" class="rounded-lg bg-acento px-3 py-2 text-sm font-semibold text-acento-texto">Sí, lo domino (≥ 80 %)</button>
+            <button name="logrado" value="0" class="rounded-lg border border-borde px-3 py-2 text-sm">Aún no, necesito practicar</button>
+          </form>
+          {% else %}
+          <a href="{% url 'sesion' t.pk %}" class="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-acento px-3 py-2 text-sm font-semibold text-acento-texto">
+            <svg viewBox="0 0 24 24" class="h-4 w-4" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> Empezar sesión
+          </a>
+          {% endif %}
+        {% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+
+{% if hechas or repasos_hechos %}
+<section class="mb-6">
+  <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-texto-suave">Tachado hoy</h2>
+  <ul class="space-y-2">
+    {% for t in hechas %}
+    <li class="flex items-center gap-3 rounded-xl border border-borde bg-superficie/60 px-4 py-3">
+      <span class="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-exito text-white">
+        <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4 10-11"/></svg>
+      </span>
+      <div class="min-w-0 flex-1">
+        <p class="tachado truncate text-texto-suave">{{ t.titulo }}</p>
+        {% if t.tema %}<p class="text-xs text-texto-suave">{{ t.detalle }}</p>{% endif %}
+      </div>
+      <form method="post" action="{% url 'deshacer' t.pk %}">
+        {% csrf_token %}<button class="text-xs text-texto-suave hover:text-texto hover:underline">Deshacer</button>
+      </form>
+    </li>
+    {% endfor %}
+    {% for r in repasos_hechos %}
+    <li class="flex items-center gap-3 rounded-xl border border-borde bg-superficie/60 px-4 py-3">
+      <span class="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-exito text-white">
+        <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4 10-11"/></svg>
+      </span>
+      <p class="tachado min-w-0 flex-1 truncate text-texto-suave">Repaso: {{ r.tema.titulo }}</p>
+      <span class="text-xs text-texto-suave">{{ r.get_resultado_display }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<section class="grid gap-3 sm:grid-cols-2">
+  <div class="rounded-2xl border border-borde bg-superficie p-4">
+    <h2 class="text-sm font-semibold">Mañana, {{ manana.dia|lower }}</h2>
+    {% if manana.estudio %}
+    <p class="mt-2 text-sm"><span class="rounded-full px-2 py-0.5 text-xs font-medium {{ manana.materia|color }}">{{ manana.materia.nombre }}</span></p>
+    <p class="mt-1 text-sm font-medium">{{ manana.estudio.tema.titulo }}</p>
+    <p class="text-xs text-texto-suave">{{ manana.estudio.paso }}</p>
+    {% elif manana.sabado %}
+    <p class="mt-2 text-sm text-texto-suave">Repaso y ejercicios de la semana.</p>
+    {% else %}
+    <p class="mt-2 text-sm text-texto-suave">Descanso. Lectura por placer si te apetece.</p>
+    {% endif %}
+  </div>
+  {% if materias_etapa %}
+  <div class="rounded-2xl border border-borde bg-superficie p-4">
+    <h2 class="text-sm font-semibold">¿Con energía extra?</h2>
+    <p class="mt-1 text-xs text-texto-suave">Adelanta la siguiente sesión. Si llegas cansado, mejor 15 minutos bien aprovechados que una hora sin concentración.</p>
+    <div class="mt-3 flex flex-wrap gap-2">
+      {% for m in materias_etapa %}
+      <form method="post" action="{% url 'estudiar_otra' m.slug %}">
+        {% csrf_token %}<button class="rounded-lg border border-borde px-3 py-1.5 text-sm hover:bg-superficie-2">+ {{ m.nombre }}</button>
+      </form>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

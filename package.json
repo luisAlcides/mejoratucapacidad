@@ -1,0 +1,12 @@
+{
+  "name": "mejoratucapacidad",
+  "private": true,
+  "scripts": {
+    "css": "tailwindcss -i tailwind/app.css -o static/css/app.css --minify",
+    "css:watch": "tailwindcss -i tailwind/app.css -o static/css/app.css --watch"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.0",
+    "tailwindcss": "^4.1.0"
+  }
+}

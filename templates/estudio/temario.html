@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% load estudio_tags %}
+{% block titulo %}Temario · Mejora tu capacidad{% endblock %}
+{% block contenido %}
+<h1 class="text-2xl font-bold">Temario</h1>
+<p class="mt-1 text-sm text-texto-suave">Todos los temas en el orden en que los irás estudiando. Avanzas al siguiente cuando resuelves el 80 % de los ejercicios básicos sin mirar.</p>
+
+<div class="mt-4 flex flex-wrap gap-3 text-xs text-texto-suave">
+  <span class="flex items-center gap-1.5"><span class="grid h-4 w-4 place-items-center rounded-full bg-exito text-[10px] text-white">✓</span> Dominado</span>
+  <span class="flex items-center gap-1.5"><span class="h-4 w-4 rounded-full border-2 border-acento bg-acento/30"></span> En curso</span>
+  <span class="flex items-center gap-1.5"><span class="h-4 w-4 rounded-full border-2 border-borde"></span> Pendiente</span>
+</div>
+
+<div class="mt-5 space-y-3">
+  {% for m in materias %}
+  <details class="group rounded-2xl border border-borde bg-superficie" {% if m.activa %}open{% endif %}>
+    <summary class="flex cursor-pointer list-none items-center gap-3 p-4">
+      <span class="h-3 w-3 shrink-0 rounded-full {{ m.materia|color:'punto' }}"></span>
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center gap-2">
+          <span class="font-semibold">{{ m.materia.nombre }}</span>
+          {% if m.activa %}<span class="rounded-full bg-acento/15 px-2 py-0.5 text-xs font-medium text-acento">Etapa actual</span>{% endif %}
+        </div>
+        <p class="truncate text-xs text-texto-suave">{{ m.materia.descripcion }}</p>
+      </div>
+      <span class="text-sm tabular-nums text-texto-suave">{{ m.dominados }}/{{ m.temas|length }}</span>
+      <svg viewBox="0 0 24 24" class="h-5 w-5 text-texto-suave transition group-open:rotate-180" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </summary>
+    <div class="px-4 pb-1">
+      <div class="h-1.5 overflow-hidden rounded-full bg-superficie-2">
+        <div class="h-full {{ m.materia|color:'barra' }}" style="width: {{ m.pct }}%"></div>
+      </div>
+    </div>
+    {% for nivel in m.niveles %}
+    {% if m.niveles|length > 1 %}<p class="px-4 pt-3 text-xs font-semibold uppercase tracking-wide text-texto-suave">{{ nivel.etiqueta }}</p>{% endif %}
+    <ol class="divide-y divide-borde px-2 pb-2 pt-2">
+      {% for t in nivel.temas %}
+      <li>
+        <a href="{% url 'tema' m.materia.slug t.tema.slug %}" class="flex items-center gap-3 rounded-lg px-2 py-2.5 hover:bg-superficie-2 {% if t.actual %}bg-acento/5{% endif %}">
+          {% if t.progreso.estado == "dominado" %}
+          <span class="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-exito text-xs text-white">✓</span>
+          {% elif t.progreso.estado == "en_curso" %}
+          <span class="grid h-6 w-6 shrink-0 place-items-center rounded-full border-2 border-acento bg-acento/20 text-[10px] font-bold text-acento">{{ t.progreso.sesiones_hechas }}</span>
+          {% else %}
+          <span class="grid h-6 w-6 shrink-0 place-items-center rounded-full border-2 border-borde text-[10px] text-texto-suave">{{ t.tema.orden }}</span>
+          {% endif %}
+          <span class="min-w-0 flex-1">
+            <span class="block text-sm {% if t.progreso.estado == 'dominado' %}tachado text-texto-suave{% else %}font-medium{% endif %}">{{ t.tema.titulo }}</span>
+            {% if t.actual %}<span class="text-xs font-medium text-acento">← Tema actual</span>{% endif %}
+          </span>
+          {% if t.progreso.tiene_notas %}<span title="Tiene notas en el cuaderno" class="text-xs text-texto-suave">📝</span>{% endif %}
+        </a>
+      </li>
+      {% endfor %}
+    </ol>
+    {% endfor %}
+  </details>
+  {% endfor %}
+</div>
+{% endblock %}

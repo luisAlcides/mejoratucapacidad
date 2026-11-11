@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% load estudio_tags %}
+{% block titulo %}Calendario · Mejora tu capacidad{% endblock %}
+{% block contenido %}
+<h1 class="text-2xl font-bold">Calendario</h1>
+<p class="mt-1 text-sm text-texto-suave">Lo que toca estudiar y repasar en los próximos 14 días si sigues el plan. Si un día no estudias, no se acumula nada: el tema espera y lo retomas donde lo dejaste.</p>
+
+<section class="mt-5 rounded-2xl border border-borde bg-superficie p-4">
+  <h2 class="text-sm font-semibold">Tu semana tipo</h2>
+  <div class="mt-3 grid grid-cols-7 gap-1 text-center text-xs">
+    {% for d in "LMXJVSD" %}<div class="font-semibold text-texto-suave">{{ d }}</div>{% endfor %}
+    {% if etapa %}
+    <div class="rounded-md py-2 {{ etapa.principal|color }}">{{ etapa.principal.nombre|truncatechars:6 }}</div>
+    <div class="rounded-md py-2 {{ etapa.complementaria|color }}">{{ etapa.complementaria.nombre|truncatechars:6 }}</div>
+    <div class="rounded-md py-2 {{ etapa.principal|color }}">{{ etapa.principal.nombre|truncatechars:6 }}</div>
+    <div class="rounded-md py-2 {{ etapa.complementaria|color }}">{{ etapa.complementaria.nombre|truncatechars:6 }}</div>
+    <div class="rounded-md py-2 {{ etapa.principal|color }}">{{ etapa.principal.nombre|truncatechars:6 }}</div>
+    <div class="rounded-md bg-superficie-2 py-2">Repaso</div>
+    <div class="rounded-md py-2 text-texto-suave">Libre</div>
+    {% endif %}
+  </div>
+  <p class="mt-3 text-xs text-texto-suave">Todos los días, menos el domingo: 8–10 min de lectura. Entre semana: 10 min de inglés con su propio temario (opcional).
+  {% if etapa.sustituta %}Al principio, <strong>{{ etapa.sustituta.nombre }}</strong> ocupa los {{ etapa.get_dia_sustituto_display|default:"jueves" }} hasta que lo termines.{% endif %}</p>
+</section>
+
+<section class="mt-6">
+  <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-texto-suave">Próximos 14 días</h2>
+  <ol class="space-y-2">
+    {% for p in pasados %}
+    <li class="flex gap-3 rounded-xl border border-borde bg-superficie/50 p-3 opacity-70">
+      <div class="w-14 shrink-0 text-center"><div class="text-xs text-texto-suave">{{ p.dia|slice:":3" }}</div><div class="text-lg font-bold">{{ p.fecha|date:"j" }}</div></div>
+      <div class="min-w-0 flex-1 text-sm">
+        {% for t in p.tareas %}<p class="tachado truncate text-texto-suave">{{ t.titulo }}</p>{% empty %}<p class="text-texto-suave">Sin tareas tachadas.</p>{% endfor %}
+      </div>
+    </li>
+    {% endfor %}
+    {% for d in proyeccion %}
+    <li class="flex gap-3 rounded-xl border p-3 {% if forloop.first %}border-acento bg-acento/5{% else %}border-borde bg-superficie{% endif %} {% if d.domingo %}opacity-70{% endif %}">
+      <div class="w-14 shrink-0 text-center">
+        <div class="text-xs {% if forloop.first %}font-semibold text-acento{% else %}text-texto-suave{% endif %}">{% if forloop.first %}Hoy{% else %}{{ d.dia|slice:":3" }}{% endif %}</div>
+        <div class="text-lg font-bold">{{ d.fecha|date:"j" }}</div>
+        <div class="text-[10px] uppercase text-texto-suave">{{ d.fecha|date:"M" }}</div>
+      </div>
+      <div class="min-w-0 flex-1">
+        {% if d.estudio %}
+        <div class="flex flex-wrap items-center gap-2 text-xs">
+          <span class="rounded-full px-2 py-0.5 font-medium {{ d.materia|color }}">{{ d.materia.nombre }}</span>
+        </div>
+        <p class="mt-1 text-sm font-semibold">{{ d.estudio.tema.titulo }}</p>
+        <p class="text-xs text-texto-suave">{{ d.estudio.paso }}</p>
+        {% elif d.sabado %}
+        <p class="text-sm font-semibold">Repaso y ejercicios de la semana</p>
+        {% elif d.domingo %}
+        <p class="text-sm font-semibold">Descanso</p><p class="text-xs text-texto-suave">Lectura por placer, si te apetece.</p>
+        {% elif d.materia %}
+        <p class="text-sm text-texto-suave">Terminaste todos los temas de {{ d.materia.nombre }}.</p>
+        {% endif %}
+        {% if d.repasos %}
+        <ul class="mt-2 space-y-0.5 border-t border-borde pt-2 text-xs">
+          {% for r in d.repasos %}<li><span class="text-texto-suave">↻ {{ r.nombre_paso }}:</span> {{ r.tema.titulo }}</li>{% endfor %}
+        </ul>
+        {% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ol>
+</section>
+
+<section class="mt-6">
+  <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-texto-suave">Plan de tres años</h2>
+  <ol class="space-y-2">
+    {% for e in etapas %}
+    <li class="rounded-xl border p-4 {% if e.id == etapa.id %}border-acento bg-acento/5{% else %}border-borde bg-superficie{% endif %}">
+      <div class="flex items-center justify-between gap-2">
+        <p class="font-semibold">{{ e.nombre }}</p>
+        {% if e.id == etapa.id %}<span class="rounded-full bg-acento px-2 py-0.5 text-xs font-semibold text-acento-texto">Ahora</span>{% endif %}
+      </div>
+      <div class="mt-2 flex flex-wrap gap-2 text-xs">
+        <span class="rounded-full px-2 py-0.5 font-medium {{ e.principal|color }}">Principal: {{ e.principal.nombre }}</span>
+        <span class="rounded-full px-2 py-0.5 font-medium {{ e.complementaria|color }}">Complementaria: {{ e.complementaria.nombre }}</span>
+        {% if e.sustituta %}<span class="rounded-full px-2 py-0.5 font-medium {{ e.sustituta|color }}">+ {{ e.sustituta.nombre }}</span>{% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ol>
+  <p class="mt-3 text-xs text-texto-suave">Dos meses por etapa no significa dominar una disciplina: es construir una base para volver a profundizar después. Puedes fijar la etapa a mano en Ajustes.</p>
+</section>
+{% endblock %}
