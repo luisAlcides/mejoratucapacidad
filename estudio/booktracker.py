@@ -73,8 +73,16 @@ def libros(token):
         datos = _peticion("GET", "books/", token=token)
         if isinstance(datos, dict):  # por si algún día se activa la paginación
             datos = datos.get("results", [])
+        for b in datos:
+            b["portada"] = portada_segura(b.get("cover_url"))
         cache.set(clave, datos, CACHE_SEGUNDOS)
     return datos
+
+
+def portada_segura(url):
+    """Solo se aceptan portadas http(s); cualquier otra cosa se descarta."""
+    url = (url or "").strip()
+    return url if url.lower().startswith(("https://", "http://")) else ""
 
 
 def olvidar(token):

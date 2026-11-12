@@ -320,6 +320,21 @@ class BookTrackerTests(TestCase):
         self.assertContains(r, "40/200 pág")
         self.assertContains(r, "BookTracker · 20 %")
 
+    def test_muestra_portadas_seguras(self):
+        from unittest import mock
+        Perfil.objects.filter(usuario=self.usuario).update(booktracker_token="abc123")
+        libro = Libro.objects.first()
+        datos = [
+            {"title": libro.titulo, "author": "", "status": "READING", "pages_read": 1, "total_pages": 9,
+             "progress_percentage": 11, "cover_url": "https://covers.example/a.jpg"},
+            {"title": "Otro", "author": "", "status": "READING", "pages_read": 1, "total_pages": 9,
+             "progress_percentage": 11, "cover_url": "javascript:alert(1)"},
+        ]
+        with mock.patch("estudio.booktracker._peticion", return_value=datos):
+            r = self.client.get(reverse("libros"))
+        self.assertContains(r, 'src="https://covers.example/a.jpg"', count=3)  # leyendo ahora + BookTracker + fila del plan
+        self.assertNotContains(r, "javascript:alert")
+
     def test_token_invalido_desconecta_sin_romper(self):
         from unittest import mock
         from . import booktracker

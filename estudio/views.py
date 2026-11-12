@@ -388,6 +388,7 @@ def libros(request):
         "anios": anios,
         "actual": actual,
         "lectura_actual": lecturas.get(actual.id) if actual else None,
+        "actual_bt": bt["indice"].get(booktracker.normalizar(actual.titulo)) if actual else None,
         "total": total,
         "terminados": terminados,
         "solo_tengo": solo_tengo,
