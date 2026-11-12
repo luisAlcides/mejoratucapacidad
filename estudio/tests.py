@@ -272,3 +272,109 @@ class VistasTestCase(TestCase):
         # Una redirección a otro sitio se ignora.
         r = self.client.post(reverse("cambiar_apariencia"), {"siguiente": "//malo.com"})
         self.assertRedirects(r, reverse("hoy"), fetch_redirect_response=False)
+
+
+class BookTrackerTests(TestCase):
+    """Conexión de solo lectura con BookTracker (la API se simula)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("cargar_plan", stdout=StringIO())
+
+    def setUp(self):
+        self.usuario = User.objects.create_user("ana", password="clave-segura-123")
+        Perfil.objects.create(usuario=self.usuario, fecha_inicio=LUNES, ingles=False)
+        from django.core.cache import cache
+        cache.clear()
+        self.client.force_login(self.usuario)
+
+    def test_conectar_guarda_token_y_no_la_contrasena(self):
+        from unittest import mock
+        with mock.patch("estudio.booktracker.obtener_token", return_value="abc123") as ot:
+            r = self.client.post(reverse("booktracker_conectar"), {"usuario": "ana", "contrasena": "secreta"})
+        self.assertRedirects(r, reverse("ajustes"))
+        ot.assert_called_once_with("ana", "secreta")
+        perfil = Perfil.objects.get(usuario=self.usuario)
+        self.assertEqual((perfil.booktracker_usuario, perfil.booktracker_token), ("ana", "abc123"))
+
+    def test_credenciales_invalidas_muestran_error(self):
+        from unittest import mock
+        from . import booktracker
+        with mock.patch("estudio.booktracker.obtener_token",
+                        side_effect=booktracker.CredencialesInvalidas("Usuario o contraseña incorrectos.")):
+            r = self.client.post(reverse("booktracker_conectar"), {"usuario": "ana", "contrasena": "mal"})
+        self.assertContains(r, "Usuario o contraseña incorrectos.")
+        self.assertEqual(Perfil.objects.get(usuario=self.usuario).booktracker_token, "")
+
+    def test_libros_muestra_progreso_y_empareja_titulos(self):
+        from unittest import mock
+        Perfil.objects.filter(usuario=self.usuario).update(booktracker_token="abc123")
+        libro = Libro.objects.first()
+        datos = [{"title": libro.titulo.upper(), "author": libro.autor, "status": "READING",
+                  "pages_read": 40, "total_pages": 200, "progress_percentage": 20}]
+        with mock.patch("estudio.booktracker._peticion", return_value=datos) as pet:
+            r = self.client.get(reverse("libros"))
+            self.client.get(reverse("libros"))  # segunda vez sale de la caché
+        pet.assert_called_once_with("GET", "books/", token="abc123")
+        self.assertContains(r, "Leyendo en BookTracker")
+        self.assertContains(r, "40/200 pág")
+        self.assertContains(r, "BookTracker · 20 %")
+
+    def test_token_invalido_desconecta_sin_romper(self):
+        from unittest import mock
+        from . import booktracker
+        Perfil.objects.filter(usuario=self.usuario).update(booktracker_token="viejo")
+        with mock.patch("estudio.booktracker._peticion", side_effect=booktracker.TokenInvalido("Token caducado.")):
+            r = self.client.get(reverse("libros"))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Vuelve a conectarlo en Ajustes")
+        self.assertEqual(Perfil.objects.get(usuario=self.usuario).booktracker_token, "")
+
+    def test_booktracker_caido_no_rompe_libros(self):
+        from unittest import mock
+        from . import booktracker
+        Perfil.objects.filter(usuario=self.usuario).update(booktracker_token="abc123")
+        with mock.patch("estudio.booktracker._peticion",
+                        side_effect=booktracker.BookTrackerError("No se pudo conectar con BookTracker.")):
+            r = self.client.get(reverse("libros"))
+        self.assertContains(r, "No se pudo conectar con BookTracker.")
+        self.assertEqual(Perfil.objects.get(usuario=self.usuario).booktracker_token, "abc123")
+
+    def test_desconectar(self):
+        Perfil.objects.filter(usuario=self.usuario).update(booktracker_token="abc123", booktracker_usuario="ana")
+        self.client.post(reverse("booktracker_desconectar"))
+        perfil = Perfil.objects.get(usuario=self.usuario)
+        self.assertEqual((perfil.booktracker_usuario, perfil.booktracker_token), ("", ""))
+
+
+class MinutosLecturaTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        call_command("cargar_plan", stdout=StringIO())
+
+    def setUp(self):
+        self.usuario = User.objects.create_user("ana", password="clave-segura-123")
+        self.perfil = Perfil.objects.create(usuario=self.usuario, fecha_inicio=LUNES, ingles=False)
+
+    def lectura(self):
+        return Tarea.objects.get(usuario=self.usuario, tipo=Tarea.LECTURA, hecha=False)
+
+    def test_automatico_sigue_la_sesion(self):
+        plan.checklist(self.usuario, LUNES)
+        self.assertTrue(self.lectura().titulo.startswith("Leer 8 min:"))
+
+    def test_elegido_en_perfil_se_usa_al_generar(self):
+        Perfil.objects.filter(pk=self.perfil.pk).update(minutos_lectura=20)
+        plan.checklist(self.usuario, LUNES)
+        self.assertTrue(self.lectura().titulo.startswith("Leer 20 min:"))
+
+    def test_cambiarlo_en_ajustes_actualiza_la_tarea_pendiente(self):
+        plan.checklist(self.usuario, LUNES)
+        self.client.force_login(self.usuario)
+        r = self.client.post(reverse("ajustes"), {
+            "fecha_inicio": "2026-11-09", "minutos_sesion": 30, "minutos_lectura": 15,
+            "zona_horaria": "America/Mexico_City", "apariencia": "claro",
+        })
+        self.assertRedirects(r, reverse("ajustes"))
+        self.assertEqual(Perfil.objects.get(pk=self.perfil.pk).minutos_lectura, 15)
+        self.assertTrue(self.lectura().titulo.startswith("Leer 15 min:"))

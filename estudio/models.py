@@ -110,6 +110,11 @@ class Perfil(models.Model):
     )
     fecha_inicio = models.DateField(default=timezone.localdate)
     minutos_sesion = models.PositiveSmallIntegerField(choices=DURACIONES, default=30)
+    LECTURAS = [(m, f"{m} minutos") for m in (5, 10, 15, 20, 30, 45, 60)]
+    minutos_lectura = models.PositiveSmallIntegerField(
+        "Lectura diaria", choices=LECTURAS, null=True, blank=True,
+        help_text="Cuánto quieres leer cada día. Vacío = según la duración de la sesión.",
+    )
     zona_horaria = models.CharField(max_length=50, default=settings.TIME_ZONE)
     ingles = models.BooleanField("Incluir práctica breve de inglés", default=True)
     CLARO, OSCURO = "claro", "oscuro"
@@ -126,6 +131,9 @@ class Perfil(models.Model):
         on_delete=models.SET_NULL,
         help_text="Déjalo vacío para que la etapa avance sola cada dos meses.",
     )
+    # Conexión de solo lectura con BookTracker: se guarda el token, nunca la contraseña.
+    booktracker_usuario = models.CharField(max_length=150, blank=True)
+    booktracker_token = models.CharField(max_length=64, blank=True)
 
     def __str__(self):
         return f"Perfil de {self.usuario}"

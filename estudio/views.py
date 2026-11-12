@@ -9,8 +9,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from . import guias, plan
-from .forms import CuadernoForm, PerfilForm, RegistroForm
+from . import booktracker, guias, plan
+from .forms import BookTrackerForm, CuadernoForm, PerfilForm, RegistroForm
 from .models import (
     Etapa,
     LecturaLibro,
@@ -242,6 +242,7 @@ def calendario(request):
             "tareas": Tarea.objects.filter(usuario=request.user, hecha_el=dia).select_related("tema__materia"),
         })
     return render(request, "estudio/calendario.html", {
+        "minutos_lectura": plan.minutos_lectura(perfil),
         "fecha": fecha,
         "etapa": etapa,
         "etapas": Etapa.objects.select_related("principal", "complementaria", "sustituta"),
@@ -336,6 +337,27 @@ def volver(request, por_defecto):
     return redirect(por_defecto)
 
 
+def libros_booktracker(usuario):
+    """Libros de BookTracker del usuario (solo lectura). Nunca rompe la página."""
+    perfil = plan.perfil_de(usuario)
+    resultado = {"conectado": bool(perfil.booktracker_token), "error": "", "leyendo": [], "indice": {}}
+    if not perfil.booktracker_token:
+        return resultado
+    try:
+        lista = booktracker.libros(perfil.booktracker_token)
+    except booktracker.TokenInvalido as e:
+        perfil.booktracker_token = ""
+        perfil.save(update_fields=["booktracker_token"])
+        resultado.update(conectado=False, error=f"{e} Vuelve a conectarlo en Ajustes.")
+        return resultado
+    except booktracker.BookTrackerError as e:
+        resultado["error"] = str(e)
+        return resultado
+    resultado["leyendo"] = [b for b in lista if b.get("status") == "READING"]
+    resultado["indice"] = booktracker.por_titulo(lista)
+    return resultado
+
+
 @login_required
 def libros(request):
     usuario = request.user
@@ -353,9 +375,16 @@ def libros(request):
         if filas:
             terminados = sum(1 for f in filas if f["lectura"] and f["lectura"].terminado)
             anios.append({"etiqueta": etiqueta, "filas": filas, "terminados": terminados})
+    bt = libros_booktracker(usuario)
+    if bt["indice"]:
+        for anio in anios:
+            for f in anio["filas"]:
+                f["bt"] = bt["indice"].get(booktracker.normalizar(f["libro"].titulo))
     total = Libro.objects.count()
     terminados = sum(1 for l in lecturas.values() if l.terminado)
     return render(request, "estudio/libros.html", {
+        "booktracker": bt,
+        "minutos_lectura": plan.minutos_lectura(plan.perfil_de(usuario)),
         "anios": anios,
         "actual": actual,
         "lectura_actual": lecturas.get(actual.id) if actual else None,
@@ -440,6 +469,49 @@ def ajustes(request):
     form = PerfilForm(request.POST or None, instance=perfil)
     if request.method == "POST" and form.is_valid():
         form.save()
+        plan.actualizar_minutos_lectura(request.user)
         messages.success(request, "Ajustes guardados.")
         return redirect("ajustes")
-    return render(request, "estudio/ajustes.html", {"form": form})
+    return render(request, "estudio/ajustes.html", {
+        "form": form,
+        "perfil": perfil,
+        "bt_form": BookTrackerForm(),
+        "bt_url": booktracker.base_url(),
+    })
+
+
+@login_required
+@require_POST
+def booktracker_conectar(request):
+    perfil = plan.perfil_de(request.user)
+    form = BookTrackerForm(request.POST)
+    if form.is_valid():
+        try:
+            token = booktracker.obtener_token(form.cleaned_data["usuario"], form.cleaned_data["contrasena"])
+        except booktracker.BookTrackerError as e:
+            form.add_error(None, str(e))
+        else:
+            perfil.booktracker_usuario = form.cleaned_data["usuario"]
+            perfil.booktracker_token = token
+            perfil.save(update_fields=["booktracker_usuario", "booktracker_token"])
+            booktracker.olvidar(token)
+            messages.success(request, "BookTracker conectado.")
+            return redirect("ajustes")
+    return render(request, "estudio/ajustes.html", {
+        "form": PerfilForm(instance=perfil),
+        "perfil": perfil,
+        "bt_form": form,
+        "bt_url": booktracker.base_url(),
+    })
+
+
+@login_required
+@require_POST
+def booktracker_desconectar(request):
+    perfil = plan.perfil_de(request.user)
+    booktracker.olvidar(perfil.booktracker_token)
+    perfil.booktracker_token = ""
+    perfil.booktracker_usuario = ""
+    perfil.save(update_fields=["booktracker_token", "booktracker_usuario"])
+    messages.success(request, "BookTracker desconectado.")
+    return redirect("ajustes")

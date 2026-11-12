@@ -69,7 +69,7 @@ class PerfilForm(EstiloMixin, forms.ModelForm):
 
     class Meta:
         model = Perfil
-        fields = ["fecha_inicio", "minutos_sesion", "zona_horaria", "apariencia", "ingles", "etapa_manual"]
+        fields = ["fecha_inicio", "minutos_sesion", "minutos_lectura", "zona_horaria", "apariencia", "ingles", "etapa_manual"]
         labels = {
             "fecha_inicio": "Fecha en que empezaste el plan",
             "minutos_sesion": "Duración de cada sesión",
@@ -80,6 +80,19 @@ class PerfilForm(EstiloMixin, forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["etapa_manual"].empty_label = "Automática (avanza cada dos meses)"
+        self.fields["minutos_lectura"].choices = [("", "Automática (según la sesión)")] + Perfil.LECTURAS
+        self.aplicar_estilo()
+
+
+class BookTrackerForm(EstiloMixin, forms.Form):
+    usuario = forms.CharField(label="Usuario de BookTracker", max_length=150)
+    contrasena = forms.CharField(
+        label="Contraseña", widget=forms.PasswordInput,
+        help_text="Solo se usa para obtener el token; no se guarda.",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.aplicar_estilo()
 
 

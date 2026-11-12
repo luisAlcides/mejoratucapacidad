@@ -17,6 +17,31 @@
   {% endfor %}
   <button class="rounded-lg bg-acento px-4 py-2 font-semibold text-acento-texto">Guardar</button>
 </form>
+<section class="mt-6 rounded-2xl border border-borde bg-superficie p-5">
+  <h2 class="font-semibold">BookTracker</h2>
+  <p class="mt-1 text-sm text-texto-suave">Muestra en «Libros» lo que registras en <a href="{{ bt_url }}" class="underline" target="_blank" rel="noopener">BookTracker</a>. Es de solo lectura: aquí no se cambia nada de tu cuenta de BookTracker.</p>
+  {% if perfil.booktracker_token %}
+  <form method="post" action="{% url 'booktracker_desconectar' %}" class="mt-4 flex flex-wrap items-center gap-3">
+    {% csrf_token %}
+    <span class="rounded-full bg-exito/15 px-2 py-0.5 text-sm font-medium text-exito">Conectado como {{ perfil.booktracker_usuario }}</span>
+    <button class="rounded-lg border border-borde px-3 py-1.5 text-sm">Desconectar</button>
+  </form>
+  {% else %}
+  <form method="post" action="{% url 'booktracker_conectar' %}" class="mt-4 space-y-4">
+    {% csrf_token %}
+    {% for e in bt_form.non_field_errors %}<p class="text-sm text-red-600">{{ e }}</p>{% endfor %}
+    {% for campo in bt_form %}
+    <label class="block">
+      <span class="mb-1 block text-sm font-medium">{{ campo.label }}</span>
+      {{ campo }}
+      {% if campo.help_text %}<span class="mt-1 block text-xs text-texto-suave">{{ campo.help_text }}</span>{% endif %}
+      {% for e in campo.errors %}<span class="mt-1 block text-xs text-red-600">{{ e }}</span>{% endfor %}
+    </label>
+    {% endfor %}
+    <button class="rounded-lg bg-acento px-4 py-2 font-semibold text-acento-texto">Conectar</button>
+  </form>
+  {% endif %}
+</section>
 <form method="post" action="{% url 'logout' %}" class="mt-6">
   {% csrf_token %}
   <p class="text-sm text-texto-suave">Conectado como <strong>{{ user.username }}</strong>.</p>

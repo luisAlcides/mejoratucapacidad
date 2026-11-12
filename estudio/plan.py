@@ -17,6 +17,7 @@ Los repasos espaciados tampoco se apilan: se muestran como máximo
 MAX_REPASOS_DIA por día, empezando por los más antiguos.
 """
 
+import re
 from datetime import timedelta
 
 from django.db import transaction
@@ -58,7 +59,19 @@ def fases_sesion(minutos):
 
 
 def minutos_lectura(perfil):
+    if perfil.minutos_lectura:
+        return perfil.minutos_lectura
     return {20: 5, 30: 8, 45: 12}.get(perfil.minutos_sesion, 8)
+
+
+def actualizar_minutos_lectura(usuario):
+    """Ajusta los minutos de la tarea de lectura pendiente al valor actual del perfil."""
+    minutos = minutos_lectura(perfil_de(usuario))
+    for tarea in Tarea.objects.filter(usuario=usuario, tipo=Tarea.LECTURA, hecha=False, opcional=False):
+        nuevo = re.sub(r"^Leer \d+ min:", f"Leer {minutos} min:", tarea.titulo)
+        if nuevo != tarea.titulo:
+            tarea.titulo = nuevo
+            tarea.save(update_fields=["titulo"])
 
 
 def perfil_de(usuario):

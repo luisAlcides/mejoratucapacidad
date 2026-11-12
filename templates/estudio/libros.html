@@ -3,7 +3,7 @@
 {% block titulo %}Libros · Mejora tu capacidad{% endblock %}
 {% block contenido %}
 <h1 class="text-2xl font-bold">Libros</h1>
-<p class="mt-1 text-sm text-texto-suave">Tu lista de lectura en el orden recomendado, acompañando el plan año por año. Lee 8–10 minutos casi todos los días y, al terminar, resume de memoria la idea principal.</p>
+<p class="mt-1 text-sm text-texto-suave">Tu lista de lectura en el orden recomendado, acompañando el plan año por año. Lee {{ minutos_lectura }} minutos casi todos los días y, al terminar, resume de memoria la idea principal.</p>
 
 <section class="mt-5 rounded-2xl border border-borde bg-superficie p-4">
   <div class="flex items-baseline justify-between text-sm">
@@ -30,6 +30,27 @@
   </div>
   {% endif %}
 </section>
+
+{% if booktracker.error %}
+<p class="mt-4 rounded-xl border border-dashed border-borde bg-superficie p-4 text-sm text-texto-suave">BookTracker: {{ booktracker.error }}</p>
+{% elif booktracker.conectado %}
+<section class="mt-5 rounded-2xl border border-borde bg-superficie p-4">
+  <h2 class="text-sm font-semibold uppercase tracking-wide text-texto-suave">Leyendo en BookTracker</h2>
+  {% for b in booktracker.leyendo %}
+  <div class="mt-3">
+    <div class="flex items-baseline justify-between gap-3 text-sm">
+      <span class="min-w-0 truncate font-medium">{{ b.title }} <span class="font-normal text-texto-suave">· {{ b.author }}</span></span>
+      <span class="shrink-0 tabular-nums text-texto-suave">{{ b.pages_read }}/{{ b.total_pages }} pág · {{ b.progress_percentage }} %</span>
+    </div>
+    <div class="mt-1.5 h-2 overflow-hidden rounded-full bg-superficie-2">
+      <div class="h-full rounded-full bg-acento" style="width: {{ b.progress_percentage }}%"></div>
+    </div>
+  </div>
+  {% empty %}
+  <p class="mt-2 text-sm text-texto-suave">No tienes ningún libro en curso en BookTracker.</p>
+  {% endfor %}
+</section>
+{% endif %}
 
 <nav class="mt-5 flex gap-2 text-sm" aria-label="Filtrar libros">
   <a href="{% url 'libros' %}" class="rounded-full px-3 py-1.5 {% if not solo_tengo %}bg-acento font-semibold text-acento-texto{% else %}border border-borde text-texto-suave hover:text-texto{% endif %}">Todos</a>
@@ -62,6 +83,7 @@
           {% if f.libro.materia %}<span class="rounded-full px-2 py-0.5 font-medium {{ f.libro.materia|color }}">{{ f.libro.materia.nombre }}</span>{% endif %}
           {% if f.actual %}<span class="rounded-full bg-acento px-2 py-0.5 font-semibold text-acento-texto">Leyendo</span>{% endif %}
           {% if f.lectura.tengo %}<span class="rounded-full bg-exito/15 px-2 py-0.5 font-medium text-exito">Lo tengo</span>{% endif %}
+          {% if f.bt %}<span class="rounded-full bg-acento/15 px-2 py-0.5 font-medium text-acento" title="Progreso registrado en BookTracker">BookTracker · {{ f.bt.progress_percentage }} %</span>{% endif %}
         </div>
         <p class="mt-1 font-semibold {% if f.lectura.terminado %}tachado text-texto-suave{% endif %}">{{ f.libro.titulo }}</p>
         <p class="text-sm text-texto-suave">{{ f.libro.autor }}</p>

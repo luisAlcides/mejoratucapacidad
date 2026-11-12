@@ -65,7 +65,7 @@ GUIAS = [
                 ("Mar, jue", "Materia complementaria (en la etapa 1, los jueves son de Aprendiendo a aprender hasta terminarlo)."),
                 ("Sábado", "Repaso y ejercicios de la semana."),
                 ("Domingo", "Descanso: lectura por placer opcional."),
-                ("Todos los días", "8–10 min de lectura; entre semana, 10 min de inglés opcional."),
+                ("Todos los días", "8–10 min de lectura (o lo que elijas en Ajustes); entre semana, 10 min de inglés opcional."),
             ]},
             {"titulo": "Cómo avanza un tema", "tipo": "pasos", "items": [
                 "Sesión 1 · Comprender: estudias la explicación.",

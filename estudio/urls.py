@@ -23,6 +23,8 @@ urlpatterns = [
     path("guia/<slug:slug>/", views.guia_detalle, name="guia_detalle"),
     path("ajustes/", views.ajustes, name="ajustes"),
     path("ajustes/apariencia/", views.cambiar_apariencia, name="cambiar_apariencia"),
+    path("ajustes/booktracker/", views.booktracker_conectar, name="booktracker_conectar"),
+    path("ajustes/booktracker/desconectar/", views.booktracker_desconectar, name="booktracker_desconectar"),
     path("cuenta/registro/", views.registro, name="registro"),
     path("cuenta/entrar/", auth_views.LoginView.as_view(authentication_form=EntrarForm), name="login"),
     path("cuenta/salir/", auth_views.LogoutView.as_view(), name="logout"),
