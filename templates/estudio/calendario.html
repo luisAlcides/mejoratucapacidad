@@ -19,7 +19,7 @@
     <div class="rounded-md py-2 text-texto-suave">Libre</div>
     {% endif %}
   </div>
-  <p class="mt-3 text-xs text-texto-suave">Todos los días, menos el domingo: {{ minutos_lectura }} min de lectura. Entre semana: 10 min de inglés con su propio temario (opcional).
+  <p class="mt-3 text-xs text-texto-suave">Todos los días, menos el domingo: {{ minutos_lectura }} min de lectura. Entre semana: {{ minutos_ingles }} min de inglés con su propio temario (opcional).
   {% if etapa.sustituta %}Al principio, <strong>{{ etapa.sustituta.nombre }}</strong> ocupa los {{ etapa.get_dia_sustituto_display|default:"jueves" }} hasta que lo termines.{% endif %}</p>
 </section>
 

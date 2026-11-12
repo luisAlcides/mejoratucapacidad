@@ -117,6 +117,11 @@ class Perfil(models.Model):
     )
     zona_horaria = models.CharField(max_length=50, default=settings.TIME_ZONE)
     ingles = models.BooleanField("Incluir práctica breve de inglés", default=True)
+    INGLES_MINUTOS = [(m, f"{m} minutos") for m in (5, 10, 15, 20, 30, 45, 60)]
+    minutos_ingles = models.PositiveSmallIntegerField(
+        "Tiempo de inglés", choices=INGLES_MINUTOS, default=10,
+        help_text="Cuánto quieres estudiar inglés cada día entre semana.",
+    )
     CLARO, OSCURO = "claro", "oscuro"
     APARIENCIAS = [(CLARO, "Claro"), (OSCURO, "Oscuro")]
     apariencia = models.CharField(max_length=10, choices=APARIENCIAS, default=CLARO)

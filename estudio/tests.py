@@ -423,7 +423,7 @@ class MinutosLecturaTests(TestCase):
         plan.checklist(self.usuario, LUNES)
         self.client.force_login(self.usuario)
         r = self.client.post(reverse("ajustes"), {
-            "fecha_inicio": "2026-11-09", "minutos_sesion": 30, "minutos_lectura": 15,
+            "fecha_inicio": "2026-11-09", "minutos_sesion": 30, "minutos_lectura": 15, "minutos_ingles": 10,
             "zona_horaria": "America/Mexico_City", "apariencia": "claro",
         })
         self.assertRedirects(r, reverse("ajustes"))
@@ -462,3 +462,56 @@ class ChatGPTTests(TestCase):
         self.assertContains(r, quote(tarea.tema.titulo))
         r = self.client.get(reverse("sesion", args=[tarea.pk]))
         self.assertContains(r, "Abrir tutor en ChatGPT")
+
+    def test_prompt_de_ingles_pide_explicar_en_ingles(self):
+        tema = Tema.objects.filter(materia__slug="ingles").first()
+        tarea = Tarea.objects.create(usuario=self.usuario, fecha=LUNES, tipo=Tarea.INGLES,
+                                     tema=tema, numero_sesion=1, titulo="Inglés")
+        prompt = plan.prompt_chatgpt(tarea, 10)
+        self.assertIn("Explícame y respóndeme en inglés", prompt)
+        self.assertNotIn("Respóndeme en español", prompt)
+        self.assertNotIn("explícame en español", prompt)
+
+    def test_prompt_normal_sigue_en_espanol(self):
+        plan.checklist(self.usuario, LUNES)
+        tarea = Tarea.objects.get(usuario=self.usuario, tipo=Tarea.ESTUDIO)
+        prompt = plan.prompt_chatgpt(tarea, 30)
+        self.assertIn("Respóndeme en español", prompt)
+        self.assertNotIn("en inglés", prompt)
+
+
+class MinutosInglesTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        call_command("cargar_plan", stdout=StringIO())
+
+    def setUp(self):
+        self.usuario = User.objects.create_user("ana", password="clave-segura-123")
+        self.perfil = Perfil.objects.create(usuario=self.usuario, fecha_inicio=LUNES, ingles=True)
+        self.client.force_login(self.usuario)
+
+    def test_por_defecto_son_10_minutos(self):
+        plan.checklist(self.usuario, LUNES)
+        tarea = Tarea.objects.get(usuario=self.usuario, tipo=Tarea.INGLES)
+        self.assertEqual(plan.minutos_de(tarea, self.perfil), 10)
+
+    def test_ajustes_cambia_la_sesion_y_el_prompt(self):
+        plan.checklist(self.usuario, LUNES)
+        r = self.client.post(reverse("ajustes"), {
+            "fecha_inicio": "2026-11-09", "minutos_sesion": 30, "minutos_ingles": 20,
+            "zona_horaria": "America/Mexico_City", "apariencia": "claro", "ingles": "on",
+        })
+        self.assertRedirects(r, reverse("ajustes"))
+        tarea = Tarea.objects.get(usuario=self.usuario, tipo=Tarea.INGLES)
+        r = self.client.get(reverse("sesion", args=[tarea.pk]))
+        self.assertEqual(r.context["minutos"], 20)
+        self.assertIn("Tengo 20 minutos", plan.prompt_chatgpt(tarea, r.context["minutos"]))
+
+    def test_practica_libre_usa_los_minutos_elegidos(self):
+        Perfil.objects.filter(pk=self.perfil.pk).update(minutos_ingles=15)
+        Tarea.objects.create(usuario=self.usuario, fecha=LUNES, tipo=Tarea.INGLES, opcional=True,
+                             titulo="Inglés: 10 min de práctica libre")
+        Perfil.objects.filter(pk=self.perfil.pk).update(minutos_ingles=30)
+        plan.actualizar_minutos(self.usuario)
+        self.assertEqual(Tarea.objects.get(usuario=self.usuario, tipo=Tarea.INGLES).titulo,
+                         "Inglés: 30 min de práctica libre")

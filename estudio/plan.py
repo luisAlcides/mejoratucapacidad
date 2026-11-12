@@ -63,7 +63,9 @@ CHATGPT_URL = "https://chatgpt.com/"
 
 
 def minutos_de(tarea, perfil):
-    return MINUTOS_PARALELA if tarea.tipo == Tarea.INGLES else perfil.minutos_sesion
+    if tarea.tipo == Tarea.INGLES:
+        return perfil.minutos_ingles or MINUTOS_PARALELA
+    return perfil.minutos_sesion
 
 
 def prompt_chatgpt(tarea, minutos, progreso=None):
@@ -71,10 +73,16 @@ def prompt_chatgpt(tarea, minutos, progreso=None):
     tema = tarea.tema
     total = tema.sesiones + (progreso.sesiones_extra if progreso else 0)
     fases = " → ".join(f"{f['nombre']} {f['minutos']} min" for f in fases_sesion(minutos))
+    ingles = tarea.tipo == Tarea.INGLES or tema.materia.slug == "ingles"
+    idioma = (
+        "Explícame y respóndeme en inglés, con un inglés claro adaptado a mi nivel; "
+        "solo si me atasco, aclárame en español la palabra o idea concreta."
+        if ingles else "Respóndeme en español."
+    )
     lineas = [
         "Quiero que seas mi profesor particular en esta sesión de estudio. Enséñame paso a paso, "
         "con ejemplos sencillos, una idea cada vez, y espera a que yo responda antes de seguir. "
-        "Hazme preguntas para comprobar que lo entendí y corrígeme si me equivoco. Respóndeme en español.",
+        "Hazme preguntas para comprobar que lo entendí y corrígeme si me equivoco. " + idioma,
         "",
         f"Materia: {tema.materia.nombre}",
         f"Tema: {tema.titulo} ({tema.get_nivel_display()})",
@@ -96,8 +104,9 @@ def prompt_chatgpt(tarea, minutos, progreso=None):
     preguntas = tema.lista_preguntas()[:5]
     if preguntas:
         lineas += ["", "Al final debería poder responder sin ayuda:"] + [f"- {p}" for p in preguntas]
-    if tarea.tipo == Tarea.INGLES:
-        lineas += ["", "Es práctica de inglés: explícame en español, pero hazme practicar en inglés."]
+    if ingles:
+        lineas += ["", "Es práctica de inglés: toda la clase en inglés y hazme hablar y escribir en inglés. "
+                       "Corrige mis errores de gramática y vocabulario explicando por qué."]
     if (tarea.numero_sesion or 1) > 1:
         lineas += ["", "Empieza con una pregunta corta para ver qué recuerdo de la sesión anterior."]
     else:
@@ -115,9 +124,15 @@ def minutos_lectura(perfil):
     return {20: 5, 30: 8, 45: 12}.get(perfil.minutos_sesion, 8)
 
 
-def actualizar_minutos_lectura(usuario):
-    """Ajusta los minutos de la tarea de lectura pendiente al valor actual del perfil."""
-    minutos = minutos_lectura(perfil_de(usuario))
+def actualizar_minutos(usuario):
+    """Ajusta los minutos de las tareas pendientes de lectura e inglés al valor actual del perfil."""
+    perfil = perfil_de(usuario)
+    for tarea in Tarea.objects.filter(usuario=usuario, tipo=Tarea.INGLES, hecha=False):
+        nuevo = re.sub(r"^Inglés: \d+ min", f"Inglés: {perfil.minutos_ingles} min", tarea.titulo)
+        if nuevo != tarea.titulo:
+            tarea.titulo = nuevo
+            tarea.save(update_fields=["titulo"])
+    minutos = minutos_lectura(perfil)
     for tarea in Tarea.objects.filter(usuario=usuario, tipo=Tarea.LECTURA, hecha=False, opcional=False):
         nuevo = re.sub(r"^Leer \d+ min:", f"Leer {minutos} min:", tarea.titulo)
         if nuevo != tarea.titulo:
@@ -296,7 +311,7 @@ def generar_dia(usuario, fecha):
             ).exists():
                 Tarea.objects.create(
                     usuario=usuario, fecha=fecha, tipo=Tarea.INGLES, opcional=True,
-                    titulo="Inglés: 10 min de práctica libre",
+                    titulo=f"Inglés: {perfil.minutos_ingles} min de práctica libre",
                     detalle="Un audio corto, una serie o leer un párrafo.",
                 )
 

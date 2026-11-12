@@ -255,6 +255,7 @@ def calendario(request):
         })
     return render(request, "estudio/calendario.html", {
         "minutos_lectura": plan.minutos_lectura(perfil),
+        "minutos_ingles": perfil.minutos_ingles,
         "fecha": fecha,
         "etapa": etapa,
         "etapas": Etapa.objects.select_related("principal", "complementaria", "sustituta"),
@@ -512,7 +513,7 @@ def ajustes(request):
     form = PerfilForm(request.POST or None, instance=perfil)
     if request.method == "POST" and form.is_valid():
         form.save()
-        plan.actualizar_minutos_lectura(request.user)
+        plan.actualizar_minutos(request.user)
         messages.success(request, "Ajustes guardados.")
         return redirect("ajustes")
     return render(request, "estudio/ajustes.html", {

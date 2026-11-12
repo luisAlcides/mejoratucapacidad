@@ -69,7 +69,7 @@ class PerfilForm(EstiloMixin, forms.ModelForm):
 
     class Meta:
         model = Perfil
-        fields = ["fecha_inicio", "minutos_sesion", "minutos_lectura", "zona_horaria", "apariencia", "ingles", "etapa_manual"]
+        fields = ["fecha_inicio", "minutos_sesion", "minutos_lectura", "zona_horaria", "apariencia", "ingles", "minutos_ingles", "etapa_manual"]
         labels = {
             "fecha_inicio": "Fecha en que empezaste el plan",
             "minutos_sesion": "Duración de cada sesión",
