@@ -65,18 +65,48 @@ def _clave_cache(token):
     return f"booktracker:libros:{token[:12]}"
 
 
+def _con_cache(clave, ruta, token):
+    """GET con caché. Si BookTracker falla, se recuerda el fallo un minuto para
+    no hacer esperar cada carga de página por el mismo servidor caído."""
+    if cache.get(f"{clave}:caido"):
+        raise BookTrackerError("BookTracker no responde ahora mismo.")
+    try:
+        return _peticion("GET", ruta, token=token)
+    except TokenInvalido:
+        raise
+    except BookTrackerError:
+        cache.set(f"{clave}:caido", True, 60)
+        raise
+
+
 def libros(token):
     """Lista de libros del usuario en BookTracker (en caché unos minutos)."""
     clave = _clave_cache(token)
     datos = cache.get(clave)
     if datos is None:
-        datos = _peticion("GET", "books/", token=token)
+        datos = _con_cache(clave, "books/", token)
         if isinstance(datos, dict):  # por si algún día se activa la paginación
             datos = datos.get("results", [])
         for b in datos:
             b["portada"] = portada_segura(b.get("cover_url"))
         cache.set(clave, datos, CACHE_SEGUNDOS)
     return datos
+
+
+def sesiones(token, libro_id):
+    """Sesiones de lectura de un libro, de la más reciente a la más antigua."""
+    clave = f"{_clave_cache(token)}:sesiones:{int(libro_id)}"
+    datos = cache.get(clave)
+    if datos is None:
+        datos = _con_cache(clave, f"books/{int(libro_id)}/sessions/", token)
+        if isinstance(datos, dict):
+            datos = datos.get("results", [])
+        cache.set(clave, datos, CACHE_SEGUNDOS)
+    return datos
+
+
+def libro_url(libro_id):
+    return f"{base_url()}/book/{int(libro_id)}/"
 
 
 def portada_segura(url):

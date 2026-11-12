@@ -18,6 +18,7 @@ MAX_REPASOS_DIA por día, empezando por los más antiguos.
 """
 
 import re
+from urllib.parse import quote
 from datetime import timedelta
 
 from django.db import transaction
@@ -56,6 +57,56 @@ def fases_sesion(minutos):
         {"nombre": n, "texto": t, "minutos": round(minutos * p / 6)}
         for n, t, p in proporciones
     ]
+
+
+CHATGPT_URL = "https://chatgpt.com/"
+
+
+def minutos_de(tarea, perfil):
+    return MINUTOS_PARALELA if tarea.tipo == Tarea.INGLES else perfil.minutos_sesion
+
+
+def prompt_chatgpt(tarea, minutos, progreso=None):
+    """Prompt para que ChatGPT haga de tutor durante una sesión de estudio."""
+    tema = tarea.tema
+    total = tema.sesiones + (progreso.sesiones_extra if progreso else 0)
+    fases = " → ".join(f"{f['nombre']} {f['minutos']} min" for f in fases_sesion(minutos))
+    lineas = [
+        "Quiero que seas mi profesor particular en esta sesión de estudio. Enséñame paso a paso, "
+        "con ejemplos sencillos, una idea cada vez, y espera a que yo responda antes de seguir. "
+        "Hazme preguntas para comprobar que lo entendí y corrígeme si me equivoco. Respóndeme en español.",
+        "",
+        f"Materia: {tema.materia.nombre}",
+        f"Tema: {tema.titulo} ({tema.get_nivel_display()})",
+    ]
+    if tema.descripcion:
+        lineas.append(f"De qué trata: {tema.descripcion}")
+    if tarea.numero_sesion:
+        lineas.append(f"Es mi sesión {tarea.numero_sesion} de {total} sobre este tema.")
+    lineas.append(f"Tengo {minutos} minutos, repartidos así: {fases}.")
+    if tema.recurso:
+        lineas.append(f"Material de referencia: {tema.recurso}")
+    if progreso:
+        if progreso.concepto.strip():
+            lineas.append(f"Lo que ya aprendí: {progreso.concepto.strip()[:300]}")
+        if progreso.errores.strip():
+            lineas.append(f"Errores que cometí antes: {progreso.errores.strip()[:300]}")
+        if progreso.preguntas.strip():
+            lineas.append(f"Dudas que me quedaron: {progreso.preguntas.strip()[:300]}")
+    preguntas = tema.lista_preguntas()[:5]
+    if preguntas:
+        lineas += ["", "Al final debería poder responder sin ayuda:"] + [f"- {p}" for p in preguntas]
+    if tarea.tipo == Tarea.INGLES:
+        lineas += ["", "Es práctica de inglés: explícame en español, pero hazme practicar en inglés."]
+    if (tarea.numero_sesion or 1) > 1:
+        lineas += ["", "Empieza con una pregunta corta para ver qué recuerdo de la sesión anterior."]
+    else:
+        lineas += ["", "Empieza con una pregunta corta para ver qué sé ya de este tema."]
+    return "\n".join(lineas)
+
+
+def chatgpt_url(prompt):
+    return f"{CHATGPT_URL}?q={quote(prompt[:3000])}"
 
 
 def minutos_lectura(perfil):

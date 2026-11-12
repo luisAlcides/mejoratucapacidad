@@ -1,4 +1,5 @@
-from datetime import timedelta
+from datetime import date, timedelta
+from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
 from django.contrib.auth import login
@@ -55,6 +56,16 @@ def hoy(request):
     completadas = len(hechas) + len(repasos_hechos)
 
     materias_etapa = [m for m in [etapa.principal, etapa.complementaria] if m] if etapa else []
+    progresos = {
+        p.tema_id: p for p in ProgresoTema.objects.filter(
+            usuario=request.user, tema_id__in=[t.tema_id for t in pendientes if t.tema_id])
+    }
+    for t in pendientes:
+        if t.tipo == Tarea.LECTURA and t.libro_id:
+            t.bt = ficha_booktracker(request.user, t.libro)
+        if t.tema_id and not t.es_comprobacion:
+            prompt = plan.prompt_chatgpt(t, plan.minutos_de(t, perfil), progresos.get(t.tema_id))
+            t.chatgpt_url = plan.chatgpt_url(prompt)
     return render(request, "estudio/hoy.html", {
         "fecha": fecha,
         "dia": plan.DIAS[fecha.weekday()],
@@ -129,7 +140,7 @@ def sesion(request, pk):
         pk=pk, usuario=request.user, tema__isnull=False,
     )
     perfil = plan.perfil_de(request.user)
-    minutos = plan.MINUTOS_PARALELA if tarea.tipo == Tarea.INGLES else perfil.minutos_sesion
+    minutos = plan.minutos_de(tarea, perfil)
     progreso, _ = ProgresoTema.objects.get_or_create(usuario=request.user, tema=tarea.tema)
     form = CuadernoForm(request.POST or None, instance=progreso)
     if request.method == "POST" and form.is_valid():
@@ -143,6 +154,7 @@ def sesion(request, pk):
         "form": form,
         "fases": plan.fases_sesion(minutos),
         "minutos": minutos,
+        "chatgpt_url": plan.chatgpt_url(plan.prompt_chatgpt(tarea, minutos, progreso)),
     })
 
 
@@ -356,6 +368,36 @@ def libros_booktracker(usuario):
     resultado["leyendo"] = [b for b in lista if b.get("status") == "READING"]
     resultado["indice"] = booktracker.por_titulo(lista)
     return resultado
+
+
+def ficha_booktracker(usuario, libro):
+    """Datos de BookTracker para un libro del plan, o None si no está allí."""
+    if libro is None:
+        return None
+    bt = libros_booktracker(usuario)
+    datos = bt["indice"].get(booktracker.normalizar(libro.titulo))
+    if not datos:
+        return None
+    ficha = {**datos, "url": booktracker.libro_url(datos["id"]), "ultima": None, "num_sesiones": None}
+    try:
+        lista = booktracker.sesiones(plan.perfil_de(usuario).booktracker_token, datos["id"])
+    except booktracker.BookTrackerError:
+        return ficha  # la ficha básica sigue sirviendo sin las sesiones
+    ficha["num_sesiones"] = len(lista)
+    if lista:
+        s = lista[0]
+        try:
+            fecha = date.fromisoformat(s.get("date") or "")
+        except ValueError:
+            fecha = None
+        try:
+            minutos = Decimal(str(s.get("duration_minutes"))).normalize()
+            minutos = f"{minutos:f}"
+        except (InvalidOperation, ValueError):
+            minutos = ""
+        ficha["ultima"] = {"fecha": fecha, "pagina": s.get("end_page"), "minutos": minutos,
+                           "notas": (s.get("notes") or "").strip()}
+    return ficha
 
 
 @login_required

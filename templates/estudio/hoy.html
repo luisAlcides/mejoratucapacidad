@@ -88,6 +88,7 @@
         </div>
         <p class="mt-1 font-semibold">{{ t.titulo }}</p>
         {% if t.detalle %}<p class="text-sm text-texto-suave">{{ t.detalle }}</p>{% endif %}
+        {% if t.bt %}{% include "estudio/_ficha_booktracker.html" with b=t.bt %}{% endif %}
 
         {% if t.tema %}
           {% if t.es_comprobacion %}
@@ -103,7 +104,7 @@
             <button name="logrado" value="0" class="rounded-lg border border-borde px-3 py-2 text-sm">Aún no, necesito practicar</button>
           </form>
           {% else %}
-          <a href="{% url 'sesion' t.pk %}" class="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-acento px-3 py-2 text-sm font-semibold text-acento-texto">
+          <a href="{% url 'sesion' t.pk %}" data-chatgpt="{{ t.chatgpt_url }}" class="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-acento px-3 py-2 text-sm font-semibold text-acento-texto">
             <svg viewBox="0 0 24 24" class="h-4 w-4" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> Empezar sesión
           </a>
           {% endif %}
@@ -172,4 +173,13 @@
   </div>
   {% endif %}
 </section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// «Empezar sesión» abre también ChatGPT, en otra pestaña, con el prompt del tema.
+document.querySelectorAll("a[data-chatgpt]").forEach((a) => {
+  a.addEventListener("click", () => { window.open(a.dataset.chatgpt, "_blank", "noopener"); });
+});
+</script>
 {% endblock %}

@@ -335,6 +335,42 @@ class BookTrackerTests(TestCase):
         self.assertContains(r, 'src="https://covers.example/a.jpg"', count=3)  # leyendo ahora + BookTracker + fila del plan
         self.assertNotContains(r, "javascript:alert")
 
+    def _hoy_con_booktracker(self, sesiones):
+        from unittest import mock
+        Perfil.objects.filter(usuario=self.usuario).update(booktracker_token="abc123")
+        libro = plan.libro_actual(self.usuario)
+        libros_bt = [{"id": 7, "title": libro.titulo, "author": "Autora", "status": "READING",
+                      "category_name": "Ensayo", "pages_read": 120, "total_pages": 300,
+                      "progress_percentage": 40, "pages_remaining": 180, "total_time_read": "2h 5m",
+                      "cover_url": "https://covers.example/hoy.jpg"}]
+
+        def falsa(metodo, ruta, token=None, cuerpo=None):
+            if ruta == "books/7/sessions/":
+                if isinstance(sesiones, Exception):
+                    raise sesiones
+                return sesiones
+            return libros_bt
+
+        with mock.patch("estudio.views.hoy_local", return_value=LUNES), \
+                mock.patch("estudio.booktracker._peticion", side_effect=falsa):
+            return self.client.get(reverse("hoy"))
+
+    def test_hoy_muestra_ficha_del_libro(self):
+        r = self._hoy_con_booktracker([
+            {"id": 2, "end_page": 120, "duration_minutes": "25.00", "date": "2026-11-08", "notes": "Idea clave"},
+            {"id": 1, "end_page": 60, "duration_minutes": "30.00", "date": "2026-11-01", "notes": ""},
+        ])
+        for texto in ['src="https://covers.example/hoy.jpg"', "Ensayo", "Página 120 de 300", "180 páginas",
+                      "2h 5m · 2 sesiones", "hasta la página 120 · 25 min", "Idea clave",
+                      "https://booktracker.up.railway.app/book/7/"]:
+            self.assertContains(r, texto)
+
+    def test_hoy_sin_sesiones_sigue_mostrando_la_ficha(self):
+        from . import booktracker
+        r = self._hoy_con_booktracker(booktracker.BookTrackerError("caído"))
+        self.assertContains(r, "Página 120 de 300")
+        self.assertNotContains(r, "Última sesión")
+
     def test_token_invalido_desconecta_sin_romper(self):
         from unittest import mock
         from . import booktracker
@@ -393,3 +429,36 @@ class MinutosLecturaTests(TestCase):
         self.assertRedirects(r, reverse("ajustes"))
         self.assertEqual(Perfil.objects.get(pk=self.perfil.pk).minutos_lectura, 15)
         self.assertTrue(self.lectura().titulo.startswith("Leer 15 min:"))
+
+
+class ChatGPTTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        call_command("cargar_plan", stdout=StringIO())
+
+    def setUp(self):
+        self.usuario = User.objects.create_user("ana", password="clave-segura-123")
+        Perfil.objects.create(usuario=self.usuario, fecha_inicio=LUNES, ingles=False)
+        self.client.force_login(self.usuario)
+
+    def test_prompt_incluye_tema_y_cuaderno(self):
+        plan.checklist(self.usuario, LUNES)
+        tarea = Tarea.objects.get(usuario=self.usuario, tipo=Tarea.ESTUDIO)
+        progreso = ProgresoTema.objects.create(usuario=self.usuario, tema=tarea.tema, preguntas="No entiendo X")
+        prompt = plan.prompt_chatgpt(tarea, 30, progreso)
+        self.assertIn("profesor particular", prompt)
+        self.assertIn(tarea.tema.titulo, prompt)
+        self.assertIn(tarea.tema.materia.nombre, prompt)
+        self.assertIn("Tengo 30 minutos", prompt)
+        self.assertIn("Dudas que me quedaron: No entiendo X", prompt)
+
+    def test_hoy_y_sesion_enlazan_chatgpt(self):
+        from unittest import mock
+        from urllib.parse import quote
+        with mock.patch("estudio.views.hoy_local", return_value=LUNES):
+            r = self.client.get(reverse("hoy"))
+        tarea = Tarea.objects.get(usuario=self.usuario, tipo=Tarea.ESTUDIO)
+        self.assertContains(r, 'data-chatgpt="https://chatgpt.com/?q=')
+        self.assertContains(r, quote(tarea.tema.titulo))
+        r = self.client.get(reverse("sesion", args=[tarea.pk]))
+        self.assertContains(r, "Abrir tutor en ChatGPT")
