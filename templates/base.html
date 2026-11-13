@@ -19,16 +19,17 @@
         <span class="grid h-8 w-8 place-items-center rounded-lg bg-acento text-acento-texto">
           <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4 10-11"/></svg>
         </span>
-        <span>Mejora tu capacidad</span>
+        <span class="sm:max-md:hidden">Mejora tu capacidad</span>
       </a>
       <nav class="hidden items-center gap-1 text-sm sm:flex">
-        <a href="{% url 'hoy' %}" class="rounded-lg px-3 py-1.5 {% if url == 'hoy' or url == 'sesion' %}bg-superficie-2 font-semibold{% else %}text-texto-suave hover:text-texto{% endif %}">Hoy</a>
-        <a href="{% url 'temario' %}" class="rounded-lg px-3 py-1.5 {% if url == 'temario' or url == 'tema' %}bg-superficie-2 font-semibold{% else %}text-texto-suave hover:text-texto{% endif %}">Temario</a>
-        <a href="{% url 'calendario' %}" class="rounded-lg px-3 py-1.5 {% if url == 'calendario' %}bg-superficie-2 font-semibold{% else %}text-texto-suave hover:text-texto{% endif %}">Calendario</a>
-        <a href="{% url 'libros' %}" class="rounded-lg px-3 py-1.5 {% if url == 'libros' %}bg-superficie-2 font-semibold{% else %}text-texto-suave hover:text-texto{% endif %}">Libros</a>
-        <a href="{% url 'guia' %}" class="rounded-lg px-3 py-1.5 {% if url == 'guia' or url == 'guia_detalle' %}bg-superficie-2 font-semibold{% else %}text-texto-suave hover:text-texto{% endif %}">Guía</a>
-        <a href="{% url 'progreso' %}" class="rounded-lg px-3 py-1.5 {% if url == 'progreso' %}bg-superficie-2 font-semibold{% else %}text-texto-suave hover:text-texto{% endif %}">Progreso</a>
-        <a href="{% url 'ajustes' %}" class="rounded-lg px-3 py-1.5 {% if url == 'ajustes' %}bg-superficie-2 font-semibold{% else %}text-texto-suave hover:text-texto{% endif %}">Ajustes</a>
+        <a href="{% url 'hoy' %}" class="rounded-lg px-2 py-1.5 md:px-2.5 {% if url == 'hoy' or url == 'sesion' %}bg-superficie-2 font-semibold{% else %}text-texto-suave hover:text-texto{% endif %}">Hoy</a>
+        <a href="{% url 'temario' %}" class="rounded-lg px-2 py-1.5 md:px-2.5 {% if url == 'temario' or url == 'tema' %}bg-superficie-2 font-semibold{% else %}text-texto-suave hover:text-texto{% endif %}">Temario</a>
+        <a href="{% url 'calendario' %}" class="rounded-lg px-2 py-1.5 md:px-2.5 {% if url == 'calendario' %}bg-superficie-2 font-semibold{% else %}text-texto-suave hover:text-texto{% endif %}">Calendario</a>
+        <a href="{% url 'libros' %}" class="rounded-lg px-2 py-1.5 md:px-2.5 {% if url == 'libros' %}bg-superficie-2 font-semibold{% else %}text-texto-suave hover:text-texto{% endif %}">Libros</a>
+        <a href="{% url 'tarjetas' %}" class="rounded-lg px-2 py-1.5 md:px-2.5 {% if url == 'tarjetas' or url == 'mazo' or url == 'tarjeta' or url == 'repasar_tarjetas' or url == 'repasar_mazo' %}bg-superficie-2 font-semibold{% else %}text-texto-suave hover:text-texto{% endif %}">Tarjetas</a>
+        <a href="{% url 'guia' %}" class="rounded-lg px-2 py-1.5 md:px-2.5 {% if url == 'guia' or url == 'guia_detalle' %}bg-superficie-2 font-semibold{% else %}text-texto-suave hover:text-texto{% endif %}">Guía</a>
+        <a href="{% url 'progreso' %}" class="rounded-lg px-2 py-1.5 md:px-2.5 {% if url == 'progreso' %}bg-superficie-2 font-semibold{% else %}text-texto-suave hover:text-texto{% endif %}">Progreso</a>
+        <a href="{% url 'ajustes' %}" class="rounded-lg px-2 py-1.5 md:px-2.5 {% if url == 'ajustes' %}bg-superficie-2 font-semibold{% else %}text-texto-suave hover:text-texto{% endif %}">Ajustes</a>
       </nav>
       <div class="flex items-center gap-1">
       <a href="{% url 'guia' %}" title="Guía y chuletas" aria-label="Guía y chuletas" class="grid h-9 w-9 place-items-center rounded-lg sm:hidden {% if url == 'guia' or url == 'guia_detalle' %}bg-superficie-2 text-texto{% else %}text-texto-suave hover:bg-superficie-2 hover:text-texto{% endif %}">

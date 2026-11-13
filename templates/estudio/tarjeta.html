@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block titulo %}Editar tarjeta · {{ tarjeta.mazo.nombre }}{% endblock %}
+{% block contenido %}
+<a href="{% url 'mazo' tarjeta.mazo_id %}" class="text-sm text-texto-suave hover:underline">← {{ tarjeta.mazo.nombre }}</a>
+<h1 class="mt-1 text-2xl font-bold">Editar tarjeta</h1>
+<form method="post" class="mt-5 space-y-3 rounded-2xl border border-borde bg-superficie p-5">
+  {% csrf_token %}
+  {% for campo in form %}
+  <label class="block">
+    <span class="mb-1 block text-sm font-medium">{{ campo.label }}</span>
+    {{ campo }}
+    {% for e in campo.errors %}<span class="mt-1 block text-xs text-red-600">{{ e }}</span>{% endfor %}
+  </label>
+  {% endfor %}
+  <p class="text-xs text-texto-suave">Cambiar el texto no reinicia su repaso.</p>
+  <button name="accion" value="guardar" class="rounded-lg bg-acento px-4 py-2 font-semibold text-acento-texto">Guardar</button>
+</form>
+<details class="mt-4 rounded-2xl border border-borde bg-superficie p-5">
+  <summary class="cursor-pointer text-sm text-red-600">Borrar tarjeta</summary>
+  <form method="post" class="mt-3">
+    {% csrf_token %}
+    <p class="text-sm">Se borrará la tarjeta con su progreso. No se puede deshacer.</p>
+    <button name="accion" value="borrar" class="mt-3 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white">Sí, borrar la tarjeta</button>
+  </form>
+</details>
+{% endblock %}

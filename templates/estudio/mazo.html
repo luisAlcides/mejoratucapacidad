@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block titulo %}{{ mazo.nombre }} · Tarjetas{% endblock %}
+{% block contenido %}
+<a href="{% url 'tarjetas' %}" class="text-sm text-texto-suave hover:underline">← Tarjetas</a>
+<div class="mt-1 flex flex-wrap items-center justify-between gap-3">
+  <h1 class="min-w-0 break-words text-2xl font-bold">{{ mazo.nombre }}</h1>
+  {% if tocan %}
+  <a href="{% url 'repasar_mazo' mazo.pk %}" class="rounded-lg bg-acento px-4 py-2 text-sm font-semibold text-acento-texto">Repasar ({{ tocan }})</a>
+  {% endif %}
+</div>
+<p class="mt-1 text-sm text-texto-suave">{{ lista|length }} tarjeta{{ lista|length|pluralize }}{% if lista and not tocan %} · nada por repasar hoy{% endif %}</p>
+
+<form method="post" id="anadir" class="mt-5 space-y-3 rounded-2xl border border-borde bg-superficie p-5">
+  {% csrf_token %}
+  <h2 class="font-semibold">Añadir una tarjeta</h2>
+  {% for campo in form %}
+  <label class="block">
+    <span class="mb-1 block text-sm font-medium">{{ campo.label }}</span>
+    {{ campo }}
+    {% for e in campo.errors %}<span class="mt-1 block text-xs text-red-600">{{ e }}</span>{% endfor %}
+  </label>
+  {% endfor %}
+  <button name="accion" value="anadir" class="rounded-lg bg-acento px-4 py-2 font-semibold text-acento-texto">Añadir</button>
+</form>
+
+<details class="mt-3 rounded-2xl border border-borde bg-superficie p-5" {% if varias %}open{% endif %}>
+  <summary class="cursor-pointer font-semibold">Añadir varias a la vez</summary>
+  <form method="post" class="mt-3 space-y-3">
+    {% csrf_token %}
+    <p class="text-sm text-texto-suave">Una tarjeta por línea, con la pregunta y la respuesta separadas por punto y coma:<br><code class="text-texto">¿Capital de Francia? ; París</code></p>
+    {% if varias %}
+    <p class="text-sm font-medium text-aviso">Estas líneas no se añadieron: les falta el punto y coma o uno de los dos lados. Corrígelas y vuelve a enviarlas.</p>
+    {% endif %}
+    <textarea name="texto" rows="6" aria-label="Tarjetas, una por línea" class="w-full rounded-lg border border-borde bg-superficie px-3 py-2 text-texto focus:border-acento focus:outline-none focus:ring-2 focus:ring-acento/30">{{ varias }}</textarea>
+    <button name="accion" value="varias" class="rounded-lg bg-acento px-4 py-2 font-semibold text-acento-texto">Añadir todas</button>
+  </form>
+</details>
+
+{% if lista %}
+<h2 class="mb-3 mt-6 text-sm font-semibold uppercase tracking-wide text-texto-suave">Tarjetas del mazo</h2>
+<ul class="space-y-2">
+  {% for t in lista %}
+  <li class="flex items-start gap-3 rounded-xl border border-borde bg-superficie p-4">
+    <div class="min-w-0 flex-1">
+      <p class="line-clamp-2 whitespace-pre-line break-words font-medium">{{ t.frente }}</p>
+      <p class="mt-1 line-clamp-2 whitespace-pre-line break-words text-sm text-texto-suave">{{ t.reverso }}</p>
+      <p class="mt-1 text-xs text-texto-suave">{% if not t.primer_repaso %}Nueva{% elif t.proxima <= hoy %}Toca hoy{% else %}Vuelve el {{ t.proxima|date:"j/m/y" }}{% endif %}</p>
+    </div>
+    <a href="{% url 'tarjeta' t.pk %}" class="shrink-0 text-sm text-texto-suave hover:text-texto hover:underline">Editar</a>
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+<details class="mt-6 rounded-2xl border border-borde bg-superficie p-5" {% if form_mazo.errors %}open{% endif %}>
+  <summary class="cursor-pointer font-semibold">Opciones del mazo</summary>
+  <form method="post" class="mt-3">
+    {% csrf_token %}
+    <label class="block">
+      <span class="mb-1 block text-sm font-medium">Nombre</span>
+      {{ form_mazo.nombre }}
+      {% for e in form_mazo.nombre.errors %}<span class="mt-1 block text-xs text-red-600">{{ e }}</span>{% endfor %}
+    </label>
+    <button name="accion" value="renombrar" class="mt-3 rounded-lg border border-borde px-4 py-2 text-sm font-medium hover:bg-superficie-2">Cambiar nombre</button>
+  </form>
+  <details class="mt-5 border-t border-borde pt-4">
+    <summary class="cursor-pointer text-sm text-red-600">Borrar mazo</summary>
+    <form method="post" class="mt-3">
+      {% csrf_token %}
+      <p class="text-sm">Se borrarán el mazo y sus {{ lista|length }} tarjeta{{ lista|length|pluralize }}, con todo su progreso. No se puede deshacer.</p>
+      <button name="accion" value="borrar" class="mt-3 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white">Sí, borrar el mazo</button>
+    </form>
+  </details>
+</details>
+{% endblock %}

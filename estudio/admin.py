@@ -1,6 +1,8 @@
 from django.contrib import admin
 
-from .models import Etapa, Libro, Materia, Perfil, ProgresoTema, Repaso, Tarea, Tema, Vocabulario
+from .models import (
+    Etapa, Libro, Materia, Mazo, Perfil, ProgresoTema, Repaso, Tarea, Tarjeta, Tema, Vocabulario,
+)
 
 
 class TemaInline(admin.TabularInline):
@@ -46,3 +48,14 @@ class VocabularioAdmin(admin.ModelAdmin):
     list_display = ["usuario", "clave", "presentada", "proxima", "nivel", "sabida"]
     list_filter = ["sabida"]
     search_fields = ["clave"]
+
+
+@admin.register(Mazo)
+class MazoAdmin(admin.ModelAdmin):
+    list_display = ["nombre", "usuario", "creado"]
+
+
+@admin.register(Tarjeta)
+class TarjetaAdmin(admin.ModelAdmin):
+    list_display = ["frente", "mazo", "nivel", "proxima", "primer_repaso"]
+    search_fields = ["frente", "reverso"]

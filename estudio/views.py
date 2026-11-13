@@ -11,16 +11,18 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from . import booktracker, guias, plan, vocabulario
-from .forms import BookTrackerForm, CuadernoForm, PerfilForm, RegistroForm
+from . import booktracker, guias, plan, tarjetas, vocabulario
+from .forms import BookTrackerForm, CuadernoForm, MazoForm, PerfilForm, RegistroForm, TarjetaForm
 from .models import (
     Etapa,
     LecturaLibro,
     Libro,
     Materia,
+    Mazo,
     ProgresoTema,
     Repaso,
     Tarea,
+    Tarjeta,
     Tema,
     Vocabulario,
 )
@@ -89,6 +91,7 @@ def hoy(request):
         "manana": plan.proyeccion(request.user, fecha + timedelta(days=1), dias=1)[0],
         "resultados": Repaso.RESULTADOS,
         "vocab": vocab,
+        "tarjetas": tarjetas.resumen(request.user, fecha),
     })
 
 
@@ -580,3 +583,106 @@ def booktracker_desconectar(request):
     perfil.save(update_fields=["booktracker_token", "booktracker_usuario"])
     messages.success(request, "BookTracker desconectado.")
     return redirect("ajustes")
+
+
+# --- Tarjetas propias ---------------------------------------------------------------
+
+
+@login_required
+def lista_mazos(request):
+    form = MazoForm(request.POST or None, usuario=request.user)
+    if request.method == "POST" and form.is_valid():
+        mazo = form.save(commit=False)
+        mazo.usuario = request.user
+        mazo.save()
+        return redirect("mazo", pk=mazo.pk)
+    return render(request, "estudio/tarjetas.html", {
+        "form": form, **tarjetas.resumen(request.user, hoy_local()),
+    })
+
+
+@login_required
+def mazo(request, pk):
+    mazo = get_object_or_404(Mazo, pk=pk, usuario=request.user)
+    accion = request.POST.get("accion")
+    form = TarjetaForm(request.POST if accion == "anadir" else None)
+    form_mazo = MazoForm(
+        request.POST if accion == "renombrar" else None, instance=mazo, usuario=request.user
+    )
+    varias = ""
+    if accion == "borrar":
+        mazo.delete()
+        messages.info(request, f"Mazo «{mazo.nombre}» borrado.")
+        return redirect("tarjetas")
+    if accion == "anadir" and form.is_valid():
+        tarjeta = form.save(commit=False)
+        tarjeta.mazo = mazo
+        tarjeta.proxima = hoy_local()
+        tarjeta.save()
+        messages.success(request, "Tarjeta añadida.")
+        return redirect(reverse("mazo", args=[mazo.pk]) + "#anadir")
+    if accion == "renombrar" and form_mazo.is_valid():
+        form_mazo.save()
+        return redirect("mazo", pk=mazo.pk)
+    if accion == "varias":
+        pares, malas = tarjetas.separar(request.POST.get("texto", ""))
+        hoy = hoy_local()
+        Tarjeta.objects.bulk_create(
+            Tarjeta(mazo=mazo, frente=frente[:2000], reverso=reverso[:2000], proxima=hoy)
+            for frente, reverso in pares
+        )
+        if pares:
+            messages.success(request, f"Tarjetas añadidas: {len(pares)}.")
+        if not malas:
+            return redirect("mazo", pk=mazo.pk)
+        # Lo que no se pudo leer vuelve al cuadro para corregirlo sin perderlo.
+        varias = "\n".join(malas)
+    if accion == "renombrar":
+        mazo.refresh_from_db()
+    hoy = hoy_local()
+    lista = list(mazo.tarjetas.all())
+    return render(request, "estudio/mazo.html", {
+        "mazo": mazo,
+        "lista": lista,
+        "tocan": len(tarjetas.cola(request.user, hoy, mazo)),
+        "form": form,
+        "form_mazo": form_mazo,
+        "varias": varias,
+        "hoy": hoy,
+    })
+
+
+@login_required
+def tarjeta(request, pk):
+    tarjeta = get_object_or_404(Tarjeta, pk=pk, mazo__usuario=request.user)
+    accion = request.POST.get("accion")
+    if accion == "borrar":
+        tarjeta.delete()
+        messages.info(request, "Tarjeta borrada.")
+        return redirect("mazo", pk=tarjeta.mazo_id)
+    form = TarjetaForm(request.POST or None, instance=tarjeta)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        return redirect("mazo", pk=tarjeta.mazo_id)
+    return render(request, "estudio/tarjeta.html", {"tarjeta": tarjeta, "form": form})
+
+
+@login_required
+def repasar(request, pk=None):
+    mazo = get_object_or_404(Mazo, pk=pk, usuario=request.user) if pk else None
+    hoy = hoy_local()
+    cola = tarjetas.cola(request.user, hoy, mazo)
+    if request.method == "POST":
+        # Solo se responde lo que sigue en la cola: un doble envío no programa dos veces.
+        elegida = next((t for t in cola if str(t.pk) == request.POST.get("tarjeta")), None)
+        resultado = request.POST.get("resultado")
+        if elegida and resultado in dict(tarjetas.RESULTADOS):
+            tarjetas.responder(elegida, resultado, hoy)
+        return redirect(request.path)
+    return render(request, "estudio/repasar.html", {
+        "mazo": mazo,
+        "tarjeta": cola[0] if cola else None,
+        "quedan": len(cola),
+        "repasadas": tarjetas.repasadas_hoy(request.user, hoy, mazo),
+        "resultados": tarjetas.RESULTADOS,
+    })

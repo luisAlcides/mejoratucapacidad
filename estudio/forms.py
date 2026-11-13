@@ -4,7 +4,7 @@ from django import forms
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.utils import timezone
 
-from .models import Perfil, ProgresoTema
+from .models import Mazo, Perfil, ProgresoTema, Tarjeta
 
 ZONAS = [
     "America/Mexico_City", "America/Bogota", "America/Lima", "America/Guayaquil",
@@ -110,4 +110,35 @@ class CuadernoForm(EstiloMixin, forms.ModelForm):
         )
         self.fields["errores"].widget.attrs["placeholder"] = "¿En qué me equivoqué y por qué?"
         self.fields["preguntas"].widget.attrs["placeholder"] = "Lo que todavía no entiendo."
+        self.aplicar_estilo()
+
+
+class MazoForm(EstiloMixin, forms.ModelForm):
+    class Meta:
+        model = Mazo
+        fields = ["nombre"]
+        labels = {"nombre": "Nombre del mazo"}
+
+    def __init__(self, *args, usuario, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.usuario = usuario
+        self.fields["nombre"].widget.attrs["placeholder"] = "Por ejemplo: Anatomía"
+        self.aplicar_estilo()
+
+    def clean_nombre(self):
+        nombre = " ".join(self.cleaned_data["nombre"].split())
+        repetido = Mazo.objects.filter(usuario=self.usuario, nombre__iexact=nombre)
+        if repetido.exclude(pk=self.instance.pk).exists():
+            raise forms.ValidationError("Ya tienes un mazo con ese nombre.")
+        return nombre
+
+
+class TarjetaForm(EstiloMixin, forms.ModelForm):
+    class Meta:
+        model = Tarjeta
+        fields = ["frente", "reverso"]
+        widgets = {f: forms.Textarea(attrs={"rows": 2}) for f in fields}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.aplicar_estilo()

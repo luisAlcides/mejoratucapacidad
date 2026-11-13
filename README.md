@@ -15,6 +15,10 @@ checklist para ir tachando la sesión de estudio, la lectura, los repasos y el i
 - **Inglés de hoy**: cada día 3 palabras, 2 verbos y 1 phrasal verb con traducción y
   ejemplo (traducción oculta tras un toque). «Ya me la sé» la cambia por otra nueva;
   «Repasar otro día» la trae de vuelta tras 1, 3, 7, 14 y 30 días.
+- **Tarjetas**: tu propio Anki. Creas mazos de cualquier tema y escribes tus tarjetas
+  (de una en una o pegando varias, `pregunta ; respuesta` por línea). Al repasar marcas
+  «Lo olvidé» (vuelve hoy mismo), «Me costó» (repite el plazo) o «Fácil» (lo alarga:
+  1, 2, 4, 7, 15, 30, 60, 120 días). Como mucho 20 tarjetas nuevas al día.
 - **Temario** completo (14 materias, 437 temas en tres niveles, con preguntas de
   autoevaluación), inglés diario en paralelo, **calendario** de 14 días, plan de
   tres años y **progreso** (racha, mapa de 12 semanas, libros).

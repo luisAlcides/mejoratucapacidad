@@ -314,3 +314,48 @@ class LecturaLibro(models.Model):
 
     class Meta:
         unique_together = [("usuario", "libro")]
+
+
+# --- Tarjetas propias del usuario -----------------------------------------------
+
+
+class Mazo(models.Model):
+    """Grupo de tarjetas de un usuario sobre el tema que quiera."""
+
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    nombre = models.CharField(max_length=80)
+    creado = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["nombre", "id"]
+        unique_together = [("usuario", "nombre")]
+
+    def __str__(self):
+        return self.nombre
+
+
+class Tarjeta(models.Model):
+    """Pregunta y respuesta escritas por el usuario, con su repaso espaciado.
+
+    La programación vive en `tarjetas.py`. Es nueva mientras `primer_repaso` está vacío.
+    """
+
+    mazo = models.ForeignKey(Mazo, on_delete=models.CASCADE, related_name="tarjetas")
+    frente = models.TextField("Pregunta", max_length=2000)
+    reverso = models.TextField("Respuesta", max_length=2000)
+    nivel = models.PositiveSmallIntegerField(default=0, help_text="Índice en INTERVALOS.")
+    proxima = models.DateField(
+        default=timezone.localdate, help_text="Día a partir del cual toca repasarla."
+    )
+    primer_repaso = models.DateField(null=True, blank=True)
+    respondida_el = models.DateField(null=True, blank=True)
+    respondida = models.DateTimeField(
+        null=True, blank=True, help_text="Momento de la última respuesta; ordena las olvidadas."
+    )
+    creada = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["creada", "id"]
+
+    def __str__(self):
+        return self.frente[:60]

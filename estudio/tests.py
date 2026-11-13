@@ -6,8 +6,8 @@ from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 
-from . import palabras, plan, vocabulario
-from .models import Libro, Perfil, ProgresoTema, Repaso, Tarea, Tema, Vocabulario
+from . import palabras, plan, tarjetas, vocabulario
+from .models import Libro, Mazo, Perfil, ProgresoTema, Repaso, Tarea, Tarjeta, Tema, Vocabulario
 
 LUNES = date(2026, 11, 9)
 
@@ -712,3 +712,208 @@ class VocabularioTests(TestCase):
         prompt = plan.prompt_chatgpt(tarea, 10, vocabulario=palabras_hoy)
         self.assertIn("today, tomorrow, yesterday, to be, to have, wake up", prompt)
         self.assertNotIn("wake up", plan.prompt_chatgpt(tarea, 10))
+
+
+class TarjetasTests(TestCase):
+    def setUp(self):
+        self.usuario = User.objects.create_user("ana", password="clave-segura-123")
+        Perfil.objects.create(usuario=self.usuario, fecha_inicio=LUNES, ingles=False)
+        self.client.force_login(self.usuario)
+        self.mazo = Mazo.objects.create(usuario=self.usuario, nombre="Anatomía")
+
+    def crear(self, n=1, mazo=None, **campos):
+        hechas = [
+            Tarjeta.objects.create(mazo=mazo or self.mazo, frente=f"P{i}", reverso=f"R{i}",
+                                   proxima=LUNES, **campos)
+            for i in range(n)
+        ]
+        return hechas[0] if n == 1 else hechas
+
+    # --- Lógica ---
+
+    def test_una_nueva_se_programa_segun_el_resultado(self):
+        facil, costo, olvide = self.crear(3)
+        tarjetas.responder(facil, "facil", LUNES)
+        tarjetas.responder(costo, "costo", LUNES)
+        tarjetas.responder(olvide, "olvide", LUNES)
+        self.assertEqual((facil.nivel, facil.proxima), (1, LUNES + timedelta(days=2)))
+        self.assertEqual((costo.nivel, costo.proxima), (0, LUNES + timedelta(days=1)))
+        self.assertEqual((olvide.nivel, olvide.proxima), (0, LUNES))
+        self.assertEqual(olvide.primer_repaso, LUNES)
+
+    def test_una_ya_vista_sube_repite_o_vuelve_al_principio(self):
+        vista = dict(nivel=3, primer_repaso=LUNES - timedelta(days=20))
+        facil, costo, olvide = self.crear(3, **vista)
+        tarjetas.responder(facil, "facil", LUNES)
+        tarjetas.responder(costo, "costo", LUNES)
+        tarjetas.responder(olvide, "olvide", LUNES)
+        self.assertEqual((facil.nivel, facil.proxima), (4, LUNES + timedelta(days=15)))
+        self.assertEqual((costo.nivel, costo.proxima), (3, LUNES + timedelta(days=7)))
+        self.assertEqual((olvide.nivel, olvide.proxima), (0, LUNES))
+        self.assertEqual(olvide.primer_repaso, LUNES - timedelta(days=20))
+
+    def test_el_ultimo_intervalo_se_repite(self):
+        t = self.crear(nivel=7, primer_repaso=LUNES - timedelta(days=200))
+        tarjetas.responder(t, "facil", LUNES)
+        self.assertEqual((t.nivel, t.proxima), (7, LUNES + timedelta(days=120)))
+
+    def test_cola_atrasadas_luego_nuevas_y_olvidadas_al_final(self):
+        nueva = self.crear()
+        ayer = self.crear(primer_repaso=LUNES - timedelta(days=9))
+        Tarjeta.objects.filter(pk=ayer.pk).update(proxima=LUNES - timedelta(days=1))
+        antigua = self.crear(primer_repaso=LUNES - timedelta(days=9))
+        Tarjeta.objects.filter(pk=antigua.pk).update(proxima=LUNES - timedelta(days=5))
+        futura = self.crear(primer_repaso=LUNES - timedelta(days=9))
+        Tarjeta.objects.filter(pk=futura.pk).update(proxima=LUNES + timedelta(days=3))
+        self.assertEqual(tarjetas.cola(self.usuario, LUNES), [antigua, ayer, nueva])
+
+        antigua.refresh_from_db()
+        tarjetas.responder(antigua, "olvide", LUNES)
+        self.assertEqual(tarjetas.cola(self.usuario, LUNES), [ayer, nueva, antigua])
+        tarjetas.responder(Tarjeta.objects.get(pk=ayer.pk), "olvide", LUNES)
+        self.assertEqual(tarjetas.cola(self.usuario, LUNES), [nueva, antigua, ayer])
+        tarjetas.responder(Tarjeta.objects.get(pk=antigua.pk), "facil", LUNES)
+        self.assertEqual(tarjetas.cola(self.usuario, LUNES), [nueva, ayer])
+
+    def test_tope_de_20_nuevas_al_dia_entre_todos_los_mazos(self):
+        otro = Mazo.objects.create(usuario=self.usuario, nombre="Historia")
+        self.crear(15)
+        self.crear(15, mazo=otro)
+        vista = self.crear(primer_repaso=LUNES - timedelta(days=3))
+        cola = tarjetas.cola(self.usuario, LUNES)
+        self.assertEqual(len(cola), 21)
+        self.assertEqual(cola[0], vista)
+        for t in cola[1:]:
+            tarjetas.responder(t, "facil", LUNES)
+        # Agotado el cupo, hoy solo queda la ya vista; ni siquiera pidiendo un mazo salen más.
+        self.assertEqual(tarjetas.cola(self.usuario, LUNES), [vista])
+        self.assertEqual(tarjetas.cola(self.usuario, LUNES, otro), [])
+        self.assertEqual(len(tarjetas.cola(self.usuario, LUNES + timedelta(days=1), otro)), 10)
+
+    def test_olvidar_una_nueva_gasta_cupo_una_sola_vez(self):
+        tandas = self.crear(21)
+        tarjetas.responder(tandas[0], "olvide", LUNES)
+        tarjetas.responder(tandas[0], "olvide", LUNES)
+        cola = tarjetas.cola(self.usuario, LUNES)
+        self.assertEqual(len(cola), 20)
+        self.assertEqual(cola[-1], tandas[0])
+        self.assertNotIn(tandas[20], cola)
+
+    def test_separar_lineas(self):
+        pares, malas = tarjetas.separar(
+            "¿Capital de Francia? ; París\n\n  a;b;c  \nsin separador\n; solo respuesta\nsolo pregunta ;\n"
+        )
+        self.assertEqual(pares, [("¿Capital de Francia?", "París"), ("a", "b;c")])
+        self.assertEqual(malas, ["sin separador", "; solo respuesta", "solo pregunta ;"])
+
+    # --- Vistas ---
+
+    def test_crear_mazo_y_nombre_repetido(self):
+        r = self.client.post(reverse("tarjetas"), {"nombre": "  Historia  "})
+        nuevo = Mazo.objects.get(nombre="Historia")
+        self.assertRedirects(r, reverse("mazo", args=[nuevo.pk]))
+        for nombre in ["anatomía", "   "]:
+            r = self.client.post(reverse("tarjetas"), {"nombre": nombre})
+            self.assertEqual(r.status_code, 200)
+            self.assertTrue(r.context["form"].errors)
+        self.assertEqual(Mazo.objects.count(), 2)
+        self.assertContains(self.client.get(reverse("tarjetas")), "Historia")
+
+    def test_anadir_editar_y_borrar_tarjeta(self):
+        url = reverse("mazo", args=[self.mazo.pk])
+        self.client.post(url, {"accion": "anadir", "frente": "<b>¿Hueso?</b>", "reverso": "Calcáneo"})
+        t = Tarjeta.objects.get()
+        self.assertEqual((t.mazo, t.reverso, t.primer_repaso), (self.mazo, "Calcáneo", None))
+        r = self.client.get(url)
+        self.assertContains(r, "&lt;b&gt;¿Hueso?&lt;/b&gt;")
+        self.assertNotContains(r, "<b>¿Hueso?</b>")
+
+        tarjetas.responder(t, "facil", LUNES)
+        r = self.client.post(reverse("tarjeta", args=[t.pk]),
+                             {"accion": "guardar", "frente": "¿Talón?", "reverso": "Calcáneo"})
+        self.assertRedirects(r, url)
+        t.refresh_from_db()
+        self.assertEqual((t.frente, t.nivel, t.proxima), ("¿Talón?", 1, LUNES + timedelta(days=2)))
+
+        self.client.post(reverse("tarjeta", args=[t.pk]), {"accion": "borrar"})
+        self.assertFalse(Tarjeta.objects.exists())
+
+    def test_pegar_varias_guarda_las_validas_y_devuelve_las_malas(self):
+        url = reverse("mazo", args=[self.mazo.pk])
+        r = self.client.post(url, {"accion": "varias", "texto": "a ; b\nmala\nc;d;e"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.context["varias"], "mala")
+        self.assertEqual(list(Tarjeta.objects.values_list("frente", "reverso")), [("a", "b"), ("c", "d;e")])
+        r = self.client.post(url, {"accion": "varias", "texto": "x ; y"})
+        self.assertRedirects(r, url)
+        self.assertEqual(Tarjeta.objects.count(), 3)
+
+    def test_renombrar_y_borrar_mazo(self):
+        url = reverse("mazo", args=[self.mazo.pk])
+        Mazo.objects.create(usuario=self.usuario, nombre="Historia")
+        r = self.client.post(url, {"accion": "renombrar", "nombre": "Historia"})
+        self.assertContains(r, "Ya tienes un mazo con ese nombre.")
+        self.assertContains(r, "<h1", count=1)
+        self.assertEqual(r.context["mazo"].nombre, "Anatomía")
+        self.client.post(url, {"accion": "renombrar", "nombre": "Cuerpo"})
+        self.mazo.refresh_from_db()
+        self.assertEqual(self.mazo.nombre, "Cuerpo")
+        self.crear(2)
+        self.assertRedirects(self.client.post(url, {"accion": "borrar"}), reverse("tarjetas"))
+        self.assertFalse(Tarjeta.objects.exists())
+
+    def test_repasar_avanza_y_termina(self):
+        hoy = date.today()
+        a, b = self.crear(2)
+        Tarjeta.objects.update(proxima=hoy)
+        url = reverse("repasar_mazo", args=[self.mazo.pk])
+        r = self.client.get(url)
+        self.assertEqual((r.context["tarjeta"], r.context["quedan"]), (a, 2))
+        self.assertRedirects(self.client.post(url, {"tarjeta": a.pk, "resultado": "facil"}), url)
+        # Un envío repetido, o con un resultado inventado, no cambia nada.
+        self.client.post(url, {"tarjeta": a.pk, "resultado": "facil"})
+        self.client.post(url, {"tarjeta": b.pk, "resultado": "perfecto"})
+        a.refresh_from_db()
+        b.refresh_from_db()
+        self.assertEqual((a.nivel, b.primer_repaso), (1, None))
+        self.client.post(reverse("repasar_tarjetas"), {"tarjeta": b.pk, "resultado": "olvide"})
+        self.assertEqual(self.client.get(url).context["tarjeta"], b)
+        self.client.post(url, {"tarjeta": b.pk, "resultado": "costo"})
+        r = self.client.get(reverse("repasar_tarjetas"))
+        self.assertIsNone(r.context["tarjeta"])
+        self.assertContains(r, "Repasaste 2 tarjetas")
+
+    def test_hoy_muestra_las_que_tocan(self):
+        r = self.client.get(reverse("hoy"))
+        self.assertContains(r, "No hay tarjetas por repasar hoy.")
+        self.crear(3)
+        Tarjeta.objects.update(proxima=date.today())
+        r = self.client.get(reverse("hoy"))
+        self.assertEqual(r.context["tarjetas"]["tocan"], 3)
+        self.assertContains(r, "<strong>3</strong> tarjetas por repasar")
+        self.mazo.delete()
+        self.assertContains(self.client.get(reverse("hoy")), "Crear mi primer mazo")
+
+    def test_lo_de_otro_usuario_no_existe(self):
+        otra = User.objects.create_user("eva", password="clave-segura-123")
+        Perfil.objects.create(usuario=otra, fecha_inicio=LUNES)
+        ajeno = Mazo.objects.create(usuario=otra, nombre="Secreto")
+        t = self.crear(mazo=ajeno)
+        Tarjeta.objects.update(proxima=date.today())
+        for nombre, pk in [("mazo", ajeno.pk), ("repasar_mazo", ajeno.pk), ("tarjeta", t.pk)]:
+            self.assertEqual(self.client.get(reverse(nombre, args=[pk])).status_code, 404, nombre)
+        self.assertEqual(self.client.post(reverse("mazo", args=[ajeno.pk]), {"accion": "borrar"}).status_code, 404)
+        self.assertEqual(self.client.post(reverse("tarjeta", args=[t.pk]), {"accion": "borrar"}).status_code, 404)
+        self.client.post(reverse("repasar_tarjetas"), {"tarjeta": t.pk, "resultado": "facil"})
+        t.refresh_from_db()
+        self.assertIsNone(t.primer_repaso)
+        self.assertNotContains(self.client.get(reverse("tarjetas")), "Secreto")
+        self.assertEqual(self.client.get(reverse("hoy")).context["tarjetas"]["tocan"], 0)
+        # Otro usuario puede usar el mismo nombre de mazo.
+        self.client.post(reverse("tarjetas"), {"nombre": "Secreto"})
+        self.assertTrue(Mazo.objects.filter(usuario=self.usuario, nombre="Secreto").exists())
+
+    def test_requieren_login(self):
+        self.client.logout()
+        for url in [reverse("tarjetas"), reverse("repasar_tarjetas"), reverse("mazo", args=[self.mazo.pk])]:
+            self.assertEqual(self.client.get(url).status_code, 302, url)

@@ -165,6 +165,22 @@
 </section>
 {% endif %}
 
+<section class="mb-6" id="tarjetas">
+  <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-texto-suave">Tarjetas</h2>
+  <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-borde bg-superficie p-4">
+    {% if tarjetas.tocan %}
+    <p>Tienes <strong>{{ tarjetas.tocan }}</strong> tarjeta{{ tarjetas.tocan|pluralize }} por repasar.</p>
+    <a href="{% url 'repasar_tarjetas' %}" class="rounded-lg bg-acento px-3 py-2 text-sm font-semibold text-acento-texto">Repasar</a>
+    {% elif tarjetas.mazos %}
+    <p class="text-sm text-texto-suave">No hay tarjetas por repasar hoy.</p>
+    <a href="{% url 'tarjetas' %}" class="rounded-lg border border-borde px-3 py-2 text-sm hover:bg-superficie-2">Ver mis mazos</a>
+    {% else %}
+    <p class="text-sm text-texto-suave">Escribe tus propias tarjetas de cualquier tema y repásalas aquí.</p>
+    <a href="{% url 'tarjetas' %}" class="rounded-lg border border-borde px-3 py-2 text-sm hover:bg-superficie-2">Crear mi primer mazo</a>
+    {% endif %}
+  </div>
+</section>
+
 {% if hechas or repasos_hechos %}
 <section class="mb-6">
   <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-texto-suave">Tachado hoy</h2>
