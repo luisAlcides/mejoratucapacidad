@@ -66,6 +66,7 @@ GUIAS = [
                 ("Sábado", "Repaso y ejercicios de la semana."),
                 ("Domingo", "Descanso: lectura por placer opcional."),
                 ("Todos los días", "8–10 min de lectura; entre semana, 10 min de inglés opcional (ambos se cambian en Ajustes)."),
+                ("Inglés de hoy", "Cada día, 3 palabras, 2 verbos y 1 phrasal verb. Marca «Ya me la sé» o «Repasar otro día»."),
             ]},
             {"titulo": "Cómo avanza un tema", "tipo": "pasos", "items": [
                 "Sesión 1 · Comprender: estudias la explicación.",

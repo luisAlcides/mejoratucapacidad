@@ -12,6 +12,9 @@ checklist para ir tachando la sesión de estudio, la lectura, los repasos y el i
 - **Regla del 80 %**: tras las sesiones de un tema viene una comprobación; si no la
   superas, se añade práctica extra.
 - **Repaso espaciado**: +1, +2, +4, +7, +15… días según cómo lo recordaste (máx. 3 al día).
+- **Inglés de hoy**: cada día 3 palabras, 2 verbos y 1 phrasal verb con traducción y
+  ejemplo (traducción oculta tras un toque). «Ya me la sé» la cambia por otra nueva;
+  «Repasar otro día» la trae de vuelta tras 1, 3, 7, 14 y 30 días.
 - **Temario** completo (14 materias, 437 temas en tres niveles, con preguntas de
   autoevaluación), inglés diario en paralelo, **calendario** de 14 días, plan de
   tres años y **progreso** (racha, mapa de 12 semanas, libros).
@@ -39,6 +42,8 @@ Pruebas: `python manage.py test estudio`
 
 El temario está en `estudio/temario.py`; tras editarlo ejecuta `cargar_plan`
 (actualiza sin borrar el progreso).
+
+El vocabulario diario de inglés está en `estudio/palabras.py` (no necesita carga).
 
 ## Desplegar en Railway
 

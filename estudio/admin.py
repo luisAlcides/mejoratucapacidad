@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Etapa, Libro, Materia, Perfil, ProgresoTema, Repaso, Tarea, Tema
+from .models import Etapa, Libro, Materia, Perfil, ProgresoTema, Repaso, Tarea, Tema, Vocabulario
 
 
 class TemaInline(admin.TabularInline):
@@ -39,3 +39,10 @@ class RepasoAdmin(admin.ModelAdmin):
 class ProgresoTemaAdmin(admin.ModelAdmin):
     list_display = ["usuario", "tema", "estado", "sesiones_hechas"]
     list_filter = ["estado"]
+
+
+@admin.register(Vocabulario)
+class VocabularioAdmin(admin.ModelAdmin):
+    list_display = ["usuario", "clave", "presentada", "proxima", "nivel", "sabida"]
+    list_filter = ["sabida"]
+    search_fields = ["clave"]

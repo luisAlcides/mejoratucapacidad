@@ -7,10 +7,11 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q, Sum
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from . import booktracker, guias, plan
+from . import booktracker, guias, plan, vocabulario
 from .forms import BookTrackerForm, CuadernoForm, PerfilForm, RegistroForm
 from .models import (
     Etapa,
@@ -21,6 +22,7 @@ from .models import (
     Repaso,
     Tarea,
     Tema,
+    Vocabulario,
 )
 
 
@@ -60,11 +62,14 @@ def hoy(request):
         p.tema_id: p for p in ProgresoTema.objects.filter(
             usuario=request.user, tema_id__in=[t.tema_id for t in pendientes if t.tema_id])
     }
+    vocab = vocabulario.del_dia(request.user, fecha) if perfil.ingles else None
+    palabras_hoy = [f.entrada["ingles"] for f in vocab["pendientes"]] if vocab else []
     for t in pendientes:
         if t.tipo == Tarea.LECTURA and t.libro_id:
             t.bt = ficha_booktracker(request.user, t.libro)
         if t.tema_id and not t.es_comprobacion:
-            prompt = plan.prompt_chatgpt(t, plan.minutos_de(t, perfil), progresos.get(t.tema_id))
+            prompt = plan.prompt_chatgpt(
+                t, plan.minutos_de(t, perfil), progresos.get(t.tema_id), vocabulario=palabras_hoy)
             t.chatgpt_url = plan.chatgpt_url(prompt)
     return render(request, "estudio/hoy.html", {
         "fecha": fecha,
@@ -83,6 +88,7 @@ def hoy(request):
         "racha": racha(request.user, fecha),
         "manana": plan.proyeccion(request.user, fecha + timedelta(days=1), dias=1)[0],
         "resultados": Repaso.RESULTADOS,
+        "vocab": vocab,
     })
 
 
@@ -125,6 +131,18 @@ def completar_repaso(request, pk):
 
 @login_required
 @require_POST
+def marcar_vocabulario(request, pk):
+    fila = get_object_or_404(Vocabulario, pk=pk, usuario=request.user)
+    accion = request.POST.get("accion")
+    if accion == "deshacer":
+        vocabulario.deshacer(fila, hoy_local())
+    elif accion in ("sabida", "repasar"):
+        vocabulario.responder(fila, accion == "sabida", hoy_local())
+    return redirect(reverse("hoy") + "#ingles")
+
+
+@login_required
+@require_POST
 def estudiar_otra(request, slug):
     materia = get_object_or_404(Materia, slug=slug)
     tarea = plan.estudiar_otra(request.user, materia, hoy_local())
@@ -154,7 +172,10 @@ def sesion(request, pk):
         "form": form,
         "fases": plan.fases_sesion(minutos),
         "minutos": minutos,
-        "chatgpt_url": plan.chatgpt_url(plan.prompt_chatgpt(tarea, minutos, progreso)),
+        "chatgpt_url": plan.chatgpt_url(plan.prompt_chatgpt(
+            tarea, minutos, progreso,
+            vocabulario=vocabulario.para_prompt(request.user, hoy_local()) if perfil.ingles else None,
+        )),
     })
 
 

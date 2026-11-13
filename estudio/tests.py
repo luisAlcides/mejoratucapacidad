@@ -6,8 +6,8 @@ from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 
-from . import plan
-from .models import Libro, Perfil, ProgresoTema, Repaso, Tarea, Tema
+from . import palabras, plan, vocabulario
+from .models import Libro, Perfil, ProgresoTema, Repaso, Tarea, Tema, Vocabulario
 
 LUNES = date(2026, 11, 9)
 
@@ -515,3 +515,200 @@ class MinutosInglesTests(TestCase):
         plan.actualizar_minutos(self.usuario)
         self.assertEqual(Tarea.objects.get(usuario=self.usuario, tipo=Tarea.INGLES).titulo,
                          "Inglés: 30 min de práctica libre")
+
+
+class VocabularioTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        call_command("cargar_plan", stdout=StringIO())
+
+    def setUp(self):
+        self.usuario = User.objects.create_user("ana", password="clave-segura-123")
+        self.perfil = Perfil.objects.create(usuario=self.usuario, fecha_inicio=LUNES, ingles=True)
+        self.client.force_login(self.usuario)
+
+    def dia(self, n=0):
+        return vocabulario.del_dia(self.usuario, LUNES + timedelta(days=n))
+
+    def test_listas_sin_duplicados_y_completas(self):
+        for lista, minimo in ((palabras.PALABRAS, 300), (palabras.VERBOS, 150), (palabras.PHRASALS, 100)):
+            ingles = [e[0] for e in lista]
+            self.assertEqual(len(ingles), len(set(ingles)), [i for i in ingles if ingles.count(i) > 1])
+            self.assertGreaterEqual(len(lista), minimo)
+            for entrada in lista:
+                self.assertEqual(len(entrada), 3, entrada)
+                self.assertTrue(all(parte.strip() for parte in entrada), entrada)
+                self.assertLessEqual(len(entrada[0]) + 2, 60)
+
+    def test_primer_dia_reparte_tres_palabras_dos_verbos_y_un_phrasal(self):
+        hoy = self.dia()
+        claves = [f.clave for f in hoy["pendientes"]]
+        self.assertEqual(claves, ["p:today", "p:tomorrow", "p:yesterday", "v:be", "v:have", "f:wake up"])
+        self.assertEqual(hoy["pendientes"][3].entrada["ingles"], "to be")
+        self.assertEqual(hoy["hechas"], [])
+        self.assertEqual(hoy["sabidas"], 0)
+        self.assertEqual(hoy["total"], len(palabras.PALABRAS) + len(palabras.VERBOS) + len(palabras.PHRASALS))
+
+    def test_llamar_dos_veces_no_duplica(self):
+        self.dia()
+        self.dia()
+        self.assertEqual(Vocabulario.objects.filter(usuario=self.usuario).count(), 6)
+
+    def test_repasar_no_trae_nuevas_el_mismo_dia(self):
+        for fila in self.dia()["pendientes"]:
+            vocabulario.responder(fila, False, LUNES)
+        hoy = self.dia()
+        self.assertEqual(hoy["pendientes"], [])
+        self.assertEqual(len(hoy["hechas"]), 6)
+        self.assertEqual(Vocabulario.objects.filter(usuario=self.usuario).count(), 6)
+
+    def test_nueva_ya_sabida_se_cambia_por_otra_del_mismo_tipo(self):
+        hoy = self.dia()
+        por_clave = {f.clave: f for f in hoy["pendientes"]}
+        vocabulario.responder(por_clave["p:today"], True, LUNES)
+        vocabulario.responder(por_clave["f:wake up"], True, LUNES)
+        hoy = self.dia()
+        self.assertEqual(
+            sorted(f.clave for f in hoy["pendientes"]),
+            sorted(["p:tomorrow", "p:yesterday", "p:week", "v:be", "v:have", "f:get up"]),
+        )
+        self.assertEqual(hoy["sabidas"], 2)
+
+    def test_quien_ya_sabe_muchas_avanza_sin_tope_y_ve_solo_las_ultimas(self):
+        for _ in range(30):
+            vocabulario.responder(self.dia()["pendientes"][0], True, LUNES)
+        hoy = self.dia()
+        self.assertEqual(len(hoy["pendientes"]), 6)
+        self.assertEqual(hoy["sabidas_hoy"], 30)
+        self.assertEqual(len(hoy["hechas"]), 3)
+
+    def test_al_dia_siguiente_llegan_nuevas_y_siguen_las_sin_marcar(self):
+        self.dia()
+        manana = self.dia(1)
+        claves = [f.clave for f in manana["pendientes"]]
+        self.assertEqual(len(claves), 12)
+        self.assertIn("p:today", claves)
+        self.assertIn("p:week", claves)
+        self.assertIn("f:get up", claves)
+
+    def test_con_doce_pendientes_no_se_reparten_nuevas(self):
+        self.dia()
+        self.dia(1)
+        self.assertEqual(len(self.dia(2)["pendientes"]), 12)
+        self.assertEqual(Vocabulario.objects.filter(usuario=self.usuario).count(), 12)
+        # Tampoco al mandarlas a repasar: siguen contando como trabajo de hoy.
+        vocabulario.responder(self.dia(2)["pendientes"][0], False, LUNES + timedelta(days=2))
+        self.dia(2)
+        self.assertEqual(Vocabulario.objects.filter(usuario=self.usuario).count(), 12)
+        # Al marcar una como sabida queda un hueco y entra una nueva.
+        vocabulario.responder(self.dia(2)["pendientes"][0], True, LUNES + timedelta(days=2))
+        self.dia(2)
+        self.assertEqual(Vocabulario.objects.filter(usuario=self.usuario).count(), 13)
+
+    def test_repasar_vuelve_tras_uno_y_luego_tres_dias(self):
+        fila = self.dia()["pendientes"][0]
+        vocabulario.responder(fila, False, LUNES)
+        fila.refresh_from_db()
+        self.assertFalse(fila.sabida)
+        self.assertEqual(fila.proxima, LUNES + timedelta(days=1))
+        manana = LUNES + timedelta(days=1)
+        vocabulario.responder(fila, False, manana)
+        fila.refresh_from_db()
+        self.assertEqual(fila.proxima, manana + timedelta(days=3))
+        self.assertNotIn(fila.clave, [f.clave for f in self.dia(2)["pendientes"]])
+        self.assertIn(fila.clave, [f.clave for f in self.dia(4)["pendientes"]])
+
+    def test_repasar_se_queda_en_treinta_dias(self):
+        fila = self.dia()["pendientes"][0]
+        for _ in range(8):
+            vocabulario.responder(fila, False, LUNES)
+        fila.refresh_from_db()
+        self.assertEqual(fila.proxima, LUNES + timedelta(days=30))
+
+    def test_sabida_no_vuelve(self):
+        fila = self.dia()["pendientes"][0]
+        vocabulario.responder(fila, True, LUNES)
+        for n in (1, 5, 40):
+            self.assertNotIn(fila.clave, [f.clave for f in self.dia(n)["pendientes"]])
+
+    def test_deshacer_la_devuelve_a_pendientes(self):
+        fila = self.dia()["pendientes"][0]
+        vocabulario.responder(fila, True, LUNES)
+        vocabulario.deshacer(fila, LUNES)
+        hoy = self.dia()
+        self.assertIn(fila.clave, [f.clave for f in hoy["pendientes"]])
+        self.assertEqual(hoy["sabidas"], 0)
+        vocabulario.responder(fila, False, LUNES)
+        vocabulario.deshacer(fila, LUNES)
+        fila.refresh_from_db()
+        self.assertEqual((fila.nivel, fila.proxima, fila.respondida_el), (0, LUNES, None))
+
+    def test_deshacer_solo_vale_el_mismo_dia(self):
+        fila = self.dia()["pendientes"][0]
+        vocabulario.responder(fila, True, LUNES)
+        vocabulario.deshacer(fila, LUNES + timedelta(days=1))
+        fila.refresh_from_db()
+        self.assertTrue(fila.sabida)
+
+    def test_clave_desconocida_se_ignora(self):
+        Vocabulario.objects.create(usuario=self.usuario, clave="p:ya-no-existe",
+                                   presentada=LUNES - timedelta(days=1), proxima=LUNES - timedelta(days=1))
+        hoy = self.dia()
+        self.assertEqual(len(hoy["pendientes"]), 6)
+        self.assertNotIn("p:ya-no-existe", [f.clave for f in hoy["pendientes"]])
+
+    def test_lista_agotada_sigue_funcionando(self):
+        ayer = LUNES - timedelta(days=1)
+        Vocabulario.objects.bulk_create(
+            Vocabulario(usuario=self.usuario, clave=clave, presentada=ayer, proxima=ayer, sabida=True)
+            for clave in vocabulario.ENTRADAS
+        )
+        hoy = self.dia()
+        self.assertEqual(hoy["pendientes"], [])
+        self.assertEqual(hoy["sabidas"], hoy["total"])
+
+    def test_hoy_muestra_la_tarjeta_solo_con_ingles_activo(self):
+        respuesta = self.client.get(reverse("hoy"))
+        self.assertContains(respuesta, "Inglés de hoy")
+        self.assertContains(respuesta, "wake up")
+        self.assertContains(respuesta, "We ran out of milk.", count=0)
+        Perfil.objects.filter(pk=self.perfil.pk).update(ingles=False)
+        Vocabulario.objects.all().delete()
+        respuesta = self.client.get(reverse("hoy"))
+        self.assertNotContains(respuesta, "Inglés de hoy")
+        self.assertEqual(Vocabulario.objects.count(), 0)
+
+    def test_marcar_desde_la_pagina(self):
+        sabida, repasar = self.dia()["pendientes"][:2]
+        hoy = self.client.get(reverse("hoy")).context["fecha"]
+        Vocabulario.objects.filter(usuario=self.usuario).update(presentada=hoy, proxima=hoy)
+        self.assertRedirects(self.client.post(reverse("vocabulario", args=[sabida.pk]), {"accion": "sabida"}),
+                             reverse("hoy") + "#ingles")
+        self.client.post(reverse("vocabulario", args=[repasar.pk]), {"accion": "repasar"})
+        sabida.refresh_from_db()
+        repasar.refresh_from_db()
+        self.assertTrue(sabida.sabida)
+        self.assertEqual(repasar.proxima, hoy + timedelta(days=1))
+        self.client.post(reverse("vocabulario", args=[sabida.pk]), {"accion": "deshacer"})
+        sabida.refresh_from_db()
+        self.assertFalse(sabida.sabida)
+        self.assertEqual(self.client.get(reverse("vocabulario", args=[sabida.pk])).status_code, 405)
+
+    def test_no_se_puede_marcar_lo_de_otro_usuario(self):
+        otra = User.objects.create_user("eva", password="clave-segura-123")
+        Perfil.objects.create(usuario=otra, fecha_inicio=LUNES, ingles=True)
+        fila = vocabulario.del_dia(otra, LUNES)["pendientes"][0]
+        respuesta = self.client.post(reverse("vocabulario", args=[fila.pk]), {"accion": "sabida"})
+        self.assertEqual(respuesta.status_code, 404)
+        fila.refresh_from_db()
+        self.assertFalse(fila.sabida)
+
+    def test_prompt_de_ingles_incluye_el_vocabulario_del_dia(self):
+        tema = Tema.objects.filter(materia__slug="ingles").first()
+        tarea = Tarea.objects.create(usuario=self.usuario, fecha=LUNES, tipo=Tarea.INGLES,
+                                     tema=tema, numero_sesion=1, titulo="Inglés")
+        palabras_hoy = vocabulario.para_prompt(self.usuario, LUNES)
+        self.assertEqual(palabras_hoy, ["today", "tomorrow", "yesterday", "to be", "to have", "wake up"])
+        prompt = plan.prompt_chatgpt(tarea, 10, vocabulario=palabras_hoy)
+        self.assertIn("today, tomorrow, yesterday, to be, to have, wake up", prompt)
+        self.assertNotIn("wake up", plan.prompt_chatgpt(tarea, 10))

@@ -281,6 +281,30 @@ class Repaso(models.Model):
         )
 
 
+class Vocabulario(models.Model):
+    """Progreso de un usuario con una entrada del vocabulario diario de inglés.
+
+    Las entradas viven en `palabras.py`; aquí solo se guarda su clave («p:today»,
+    «v:borrow», «f:wake up») y cuándo vuelve a tocar.
+    """
+
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    clave = models.CharField(max_length=60)
+    presentada = models.DateField(help_text="Día en que salió por primera vez.")
+    proxima = models.DateField(help_text="Día a partir del cual vuelve a aparecer.")
+    nivel = models.PositiveSmallIntegerField(default=0, help_text="Veces que se pidió repasar.")
+    sabida = models.BooleanField(default=False)
+    respondida_el = models.DateField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["proxima", "id"]
+        unique_together = [("usuario", "clave")]
+        verbose_name_plural = "vocabulario"
+
+    def __str__(self):
+        return self.clave
+
+
 class LecturaLibro(models.Model):
     usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     libro = models.ForeignKey(Libro, on_delete=models.CASCADE)

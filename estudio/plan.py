@@ -68,8 +68,11 @@ def minutos_de(tarea, perfil):
     return perfil.minutos_sesion
 
 
-def prompt_chatgpt(tarea, minutos, progreso=None):
-    """Prompt para que ChatGPT haga de tutor durante una sesión de estudio."""
+def prompt_chatgpt(tarea, minutos, progreso=None, vocabulario=None):
+    """Prompt para que ChatGPT haga de tutor durante una sesión de estudio.
+
+    `vocabulario` son las palabras de inglés del día; solo se usan en la práctica de inglés.
+    """
     tema = tarea.tema
     total = tema.sesiones + (progreso.sesiones_extra if progreso else 0)
     fases = " → ".join(f"{f['nombre']} {f['minutos']} min" for f in fases_sesion(minutos))
@@ -107,6 +110,9 @@ def prompt_chatgpt(tarea, minutos, progreso=None):
     if ingles:
         lineas += ["", "Es práctica de inglés: toda la clase en inglés y hazme hablar y escribir en inglés. "
                        "Corrige mis errores de gramática y vocabulario explicando por qué."]
+        if vocabulario:
+            lineas += ["", "Mi vocabulario de hoy: " + ", ".join(vocabulario) + ". "
+                           "Úsalo en tus ejemplos y pídeme frases propias con cada una."]
     if (tarea.numero_sesion or 1) > 1:
         lineas += ["", "Empieza con una pregunta corta para ver qué recuerdo de la sesión anterior."]
     else:
